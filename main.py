@@ -8,12 +8,11 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 import torchvision.transforms as transforms
 from data.cifar import CIFAR10, CIFAR100
-from model import cotnet
 import argparse, sys
 import numpy as np
 from data.mask_data import Mask_Select
 
-from resnet import ResNet101
+from resnet import ResNet50, ResNet101
 parser = argparse.ArgumentParser()
 parser.add_argument('--result_dir', type = str, help = 'dir to save result txt files', default = '../results/')
 parser.add_argument('--noise_rate', type = float, help = 'corruption rate, should be less than 1', default = 0.2)
@@ -21,7 +20,7 @@ parser.add_argument('--forget_rate', type = float, help = 'forget rate', default
 parser.add_argument('--noise_type', type = str, help='[pairflip, symmetric]', default='symmetric')
 
 parser.add_argument('--dataset', type = str, help = 'mnist,minimagenet, cifar10, or cifar100', default = 'cifar100')
-parser.add_argument('--n_epoch', type=int, default=250)
+parser.add_argument('--n_epoch', type=int, default=1)
 parser.add_argument('--seed', type=int, default=2)
 
 parser.add_argument('--batch_size', type=int, default=128)
@@ -30,12 +29,12 @@ parser.add_argument('--transforms', type=str, default="false")
 
 parser.add_argument('--unstabitily_batch', type=int, default=16)
 args = parser.parse_args()
-print (args)
+print(args)
 # Seed
 torch.manual_seed(args.seed)
 torch.cuda.manual_seed(args.seed)
 
-network_map={'coteacher':cotnet,'resnet101':ResNet101}
+network_map={'resnet50':ResNet50,'resnet101':ResNet101}
 CNN=network_map[args.network]
 
 
