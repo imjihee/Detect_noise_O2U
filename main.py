@@ -2,6 +2,7 @@
 
 #sudo python main.py --n_epoch=250 --method=ours-base  --dataset=cifar100 --batch_size=128
 import torch
+import pathlib
 import datetime
 from pytz import timezone
 import argparse, sys
@@ -21,6 +22,7 @@ parser.add_argument('--result_dir', type = str, help = 'dir to save result txt f
 parser.add_argument('--noise_rate', type = float, help = 'corruption rate, should be less than 1', default = 0.3)
 parser.add_argument('--remove_rate', type = float, help = 'rate of the total dataset to be removed', default = None) 
 parser.add_argument('--noise_type', type = str, help='[pairflip, symmetric]', default='symmetric')
+parser.add_argument('--fname',type=str, default = "", help='log folder name')
 
 parser.add_argument('--dataset', type = str, help = 'mnist, minimagenet, cifar10, cifar100', default = 'cifar10')
 parser.add_argument('--n_epoch1', type=int, default=1) #train epoch for stage 1. minimum 1
@@ -216,11 +218,11 @@ def second_stage(network,test_loader,max_epoch=args.n_epoch2):
 	return mask, ind_1_sorted[:num_remember] #second stage finish
 
 class Logger(object):
-	def __init__(self):
+	def __init__(self, dir):
 		td = datetime.datetime.now(timezone('Asia/Seoul'))
-		file_name = td.strftime('%m-%d_%H.%M ') + "noise_" + str(args.noise_rate) + ".log"
+		file_name = td.strftime('%m-%d_%H.%M') + ".log"
 		self.terminal = sys.stdout
-		self.log = open("log/" + file_name, "a")
+		self.log = open(dir + "/" + file_name, "a")
 
 	def write(self, temp):
 		self.terminal.write(temp)
@@ -230,8 +232,15 @@ class Logger(object):
 		pass
 
 """main"""
-sys.stdout = Logger()
+output_d = "log/" + args.dataset + "/noise_" + str(args.noise_rate) + "_remove_" + str(args.remove_rate)
+output_dir = pathlib.Path(output_d)
+output_dir.mkdir(exist_ok=True, parents=True)
+args.fname = output_d
+
+sys.stdout = Logger(output_d)
+
 print(args)
+
 basenet= CNN(input_channel=input_channel, n_outputs=num_classes).cuda()
 test_loader = torch.utils.data.DataLoader(
 	dataset=test_dataset,batch_size=128,

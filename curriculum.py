@@ -60,7 +60,7 @@ def third_stage(args, noise_or_not, network, train_dataset, test_loader, filter_
 
         test_acc.append(accuracy)
         train_loss.append(globals_loss/ndata)
-        
+
     log_data = np.concatenate(([train_loss], [test_acc]), axis=0)
     export_toexcel(args, log_data)
 
@@ -69,7 +69,7 @@ def export_toexcel(args, data):
     df = pd.DataFrame(data)
     df = (df.T)
 
-    xlsx_path = 'save/nrate_'+ str(args.noise_rate) + '_curr_' + str(args.curriculum) + '_' + str(args.dataset) +'.xlsx'
+    xlsx_path =  args.fname + '/acc_curr_' + str(args.curriculum) + '_' + str(args.dataset) +'.xlsx'
     writer1 = pd.ExcelWriter(xlsx_path, engine='xlsxwriter')
 
     df.columns = ['train loss', 'test acc']
