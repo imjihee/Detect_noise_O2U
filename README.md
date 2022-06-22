@@ -22,3 +22,6 @@ epoch:10 lr:0.009100 train_loss: 3.1395677614974975 test_accuarcy:55.330000 nois
 2022/05/26
 1. python main.py  --network=resnet101 --transforms=true (network: resnet50 / resnet101)
 
+2022/6/3
+1. first stage, second stage: *main.py*
+2. third stage: *curriculum.py* : apply curriculum learning with masked dataset

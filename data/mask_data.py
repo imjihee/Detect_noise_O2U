@@ -1,21 +1,39 @@
 from  torch.utils import data
 from  PIL import  Image
+import numpy as np
 from  io import BytesIO
 class Mask_Select(data.Dataset):
-    def __init__(self, origin_dataset,mask_index):
+    def __init__(self, origin_dataset,mask_index, idx_sorted, curriculum):
         self.transform = origin_dataset.transform
         self.target_transform = origin_dataset.target_transform
         labels=origin_dataset.train_noisy_labels
         dataset=origin_dataset.train_data
         self.dataname=origin_dataset.dataset
         self.origin_dataset=origin_dataset
-        self.train_data=[]
-        self.train_noisy_labels=[]
-        for i,m in enumerate(mask_index):
-            if m<0.5:
-                continue
-            self.train_data.append(dataset[i])
-            self.train_noisy_labels.append(labels[i])
+
+        if curriculum:
+            print("Build Curriculum Dataset")
+            self.train_data=[0]*len(labels)
+            self.train_noisy_labels=[-1]*len(labels)
+            for i,m in enumerate(mask_index):
+                if m<0.5:
+                    continue
+                #mask=1인 경우
+                idx = idx_sorted.index(i) #mask index에 해당하는 데이터의 loss 순서 반환(오름차순)
+                self.train_data[idx] = dataset[i] #해당 순서에 data 저장 --> Loss 순서대로 데이터셋 정렬
+                self.train_noisy_labels[idx] = labels[i]
+
+            self.train_data = [i for i in self.train_data if 'array' in str(type(i))]
+            self.train_noisy_labels = [i for i in self.train_noisy_labels if i != -1]
+        else:
+            self.train_data = []
+            self.train_noisy_labels = []
+            for i, m in enumerate(mask_index):
+                if m < 0.5:
+                    continue
+                # mask=1인 경우
+                self.train_data.append(dataset[i])
+                self.train_noisy_labels.append(labels[i])
 
 
         print ("origin set number:%d"%len(labels),"after clean number:%d" % len(self.train_noisy_labels))

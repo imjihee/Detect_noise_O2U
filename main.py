@@ -3,6 +3,7 @@
 #sudo python main.py --n_epoch=250 --method=ours-base  --dataset=cifar100 --batch_size=128
 import torch
 import datetime
+from pytz import timezone
 import argparse, sys
 import numpy as np
 import torch.nn.functional as F
@@ -18,13 +19,13 @@ from resnet import ResNet50, ResNet101
 parser = argparse.ArgumentParser()
 parser.add_argument('--result_dir', type = str, help = 'dir to save result txt files', default = '../results/')
 parser.add_argument('--noise_rate', type = float, help = 'corruption rate, should be less than 1', default = 0.3)
-parser.add_argument('--forget_rate', type = float, help = 'forget rate', default = None)
+parser.add_argument('--remove_rate', type = float, help = 'rate of the total dataset to be removed', default = None) 
 parser.add_argument('--noise_type', type = str, help='[pairflip, symmetric]', default='symmetric')
 
-parser.add_argument('--dataset', type = str, help = 'mnist,minimagenet, cifar10, or cifar100', default = 'cifar100')
+parser.add_argument('--dataset', type = str, help = 'mnist, minimagenet, cifar10, cifar100', default = 'cifar10')
 parser.add_argument('--n_epoch1', type=int, default=1) #train epoch for stage 1. minimum 1
-parser.add_argument('--n_epoch3', type=int, default=10) #train epoch for stage 3. minimum 1
-parser.add_argument('--max_epoch', type=int, default=2) #train epoch for stage 2. original 250. minimum 2
+parser.add_argument('--n_epoch2', type=int, default=2) #train epoch for stage 2. original 250. minimum 2
+parser.add_argument('--n_epoch3', type=int, default=3) #train epoch for stage 3. minimum 1
 parser.add_argument('--seed', type=int, default=2)
 
 parser.add_argument('--batch_size', type=int, default=128)
@@ -32,6 +33,8 @@ parser.add_argument('--network', type=str, default="resnet50")
 parser.add_argument('--transforms', type=str, default="false")
 
 parser.add_argument('--unstabitily_batch', type=int, default=16)
+
+parser.add_argument('--curriculum', action='store_true')
 args = parser.parse_args()
 print(args)
 # Seed
@@ -90,10 +93,10 @@ if args.dataset=='cifar100':
 								noise_type=args.noise_type,
 				noise_rate=args.noise_rate
 					)
-if args.forget_rate is None:
-	forget_rate=args.noise_rate
+if args.remove_rate is None:
+	remove_rate=args.noise_rate
 else:
-	forget_rate=args.forget_rate
+	remove_rate=args.remove_rate
 #
 noise_or_not = train_dataset.noise_or_not
 
@@ -150,7 +153,7 @@ def first_stage(network,test_loader,filter_mask=None):
 			torch.save(network.state_dict(), save_checkpoint)
 
 
-def second_stage(network,test_loader,max_epoch=args.max_epoch):
+def second_stage(network,test_loader,max_epoch=args.n_epoch2):
 	train_loader_detection = torch.utils.data.DataLoader(dataset=train_dataset,
 											   batch_size=16,
 											   num_workers=32,
@@ -198,8 +201,8 @@ def second_stage(network,test_loader,max_epoch=args.max_epoch):
 		ind_1_sorted = np.argsort(moving_loss_dic)
 		loss_1_sorted = moving_loss_dic[ind_1_sorted]
 		#loss 오름차순 순서대로 loss_1_sorted에 저장됨. loss 오름차순 순서의 인덱스가 ind_1_sorted에 저장됨.
-		remember_rate = 1 - forget_rate
-		num_remember = int(remember_rate * len(loss_1_sorted)) #num_remember: 40000 @ forget_rate=0.2
+		remember_rate = 1 - remove_rate
+		num_remember = int(remember_rate * len(loss_1_sorted)) #num_remember: 40000 @ remove_rate=0.2
 
 		noise_accuracy=np.sum(noise_or_not[ind_1_sorted[num_remember:]]) / float(len(loss_1_sorted)-num_remember)
 		mask = np.ones_like(noise_or_not,dtype=np.float32)
@@ -210,18 +213,21 @@ def second_stage(network,test_loader,max_epoch=args.max_epoch):
 
 		print ("Stage 2 - " + "epoch:%d" % epoch, "lr:%f" % lr, "train_loss:", globals_loss / ndata, "test_accuarcy:%f" % accuracy,"noise_accuracy:%f"%(1-noise_accuracy),"top 0.1 noise accuracy:%f"%top_accuracy)
 
-	return mask #second stage finish
+	return mask, ind_1_sorted[:num_remember] #second stage finish
 
 class Logger(object):
 	def __init__(self):
-		td = datetime.datetime.now()
-		file_name = td.astimezone().strftime('%m-%d_%H.%M ') + "noise_" + str(args.noise_rate) + ".log"
+		td = datetime.datetime.now(timezone('Asia/Seoul'))
+		file_name = td.strftime('%m-%d_%H.%M ') + "noise_" + str(args.noise_rate) + ".log"
 		self.terminal = sys.stdout
 		self.log = open("log/" + file_name, "a")
 
 	def write(self, temp):
 		self.terminal.write(temp)
 		self.log.write(temp)
+	
+	def flush(self):
+		pass
 
 """main"""
 sys.stdout = Logger()
@@ -231,8 +237,8 @@ test_loader = torch.utils.data.DataLoader(
 	dataset=test_dataset,batch_size=128,
 	num_workers=32,shuffle=False, pin_memory=False)
 first_stage(network=basenet,test_loader=test_loader)
-filter_mask=second_stage(network=basenet,test_loader=test_loader)
-third_stage(args, noise_or_not=noise_or_not, network=basenet,train_dataset=train_dataset, test_loader=test_loader, filter_mask=filter_mask)
+filter_mask, ind_1_sorted = second_stage(network=basenet,test_loader=test_loader)
+third_stage(args, noise_or_not=noise_or_not, network=basenet,train_dataset=train_dataset, test_loader=test_loader, filter_mask=filter_mask, idx_sorted=ind_1_sorted.tolist())
 #First stage --> get Filter mask from second stage --> first stage with Filter mask
 # 마지막 단계: first stage with Filter mask를 curriculum learning with ricap으로 바꾸면 될듯
 
