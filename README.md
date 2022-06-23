@@ -1,18 +1,21 @@
-### noisy label detection implementation
+### Noisy Label Detection Implementation
 O2U-Net + some modifications
 
 O2U-Net implementation source git: [link](https://github.com/hjimce/O2U-Net)
 
 <p align="center">
-  <img src="image/flow.jpg" width="600" height="250 />
+  <img src="image/flow.jpg" width="600" height="250" />
 </p>
+     
+#### Usage Example
 ```shell
 noise detection run：python main.py  --network=resnet101 --transforms=true
 ```
 
+<br/>
+
 ---
 #### My Logs
-***
 
 2022/05
 1. Remove Caffe2 thread-pool leak warning: [link](https://github.com/pytorch/pytorch/commit/567e6d3a8766133f384eb1e00635b21ed638d187)
