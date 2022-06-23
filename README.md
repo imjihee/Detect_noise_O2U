@@ -3,14 +3,15 @@ O2U-Net + some modifications
 
 O2U-Net implementation source git: [link](https://github.com/hjimce/O2U-Net)
 
-<img src="https://github.com/imjihee/Detect_noise_loss/image/flow.jpg" width="500" height="200">
-
+<p align="center">
+  <img src="image/flow.jpg" width="600" height="250 />
+</p>
 ```shell
 noise detection run：python main.py  --network=resnet101 --transforms=true
 ```
 
 ---
-#### my logs
+#### My Logs
 ***
 
 2022/05
@@ -27,3 +28,4 @@ epoch:10 lr:0.009100 train_loss: 3.1395677614974975 test_accuarcy:55.330000 nois
 2. third stage: *curriculum.py* : apply curriculum learning with masked dataset
 3. mod save directory
 4. Usage: python main.py  --network=resnet50  --noise_rate 0.6 --remove_rate 0.8
+5. Add readme flow.jpg image
