@@ -25,9 +25,9 @@ parser.add_argument('--noise_type', type = str, help='[pairflip, symmetric]', de
 parser.add_argument('--fname',type=str, default = "", help='log folder name')
 
 parser.add_argument('--dataset', type = str, help = 'mnist, minimagenet, cifar10, cifar100', default = 'cifar10')
-parser.add_argument('--n_epoch1', type=int, default=1) #train epoch for stage 1. minimum 1
-parser.add_argument('--n_epoch2', type=int, default=2) #train epoch for stage 2. original 250. minimum 2
-parser.add_argument('--n_epoch3', type=int, default=3) #train epoch for stage 3. minimum 1
+parser.add_argument('--n_epoch1', type=int, default=10) #train epoch for stage 1. minimum 1
+parser.add_argument('--n_epoch2', type=int, default=150) #train epoch for stage 2. original 250. minimum 2
+parser.add_argument('--n_epoch3', type=int, default=200) #train epoch for stage 3. minimum 1
 parser.add_argument('--seed', type=int, default=2)
 
 parser.add_argument('--batch_size', type=int, default=128)
@@ -102,26 +102,18 @@ else:
 #
 noise_or_not = train_dataset.noise_or_not
 
+"""
+First Stage
+"""
+def first_stage(network,test_loader):
 
-def first_stage(network,test_loader,filter_mask=None):
-	# third stage
-	if filter_mask is not None:
-		stage = 3
-		train_loader_init = torch.utils.data.DataLoader(dataset=Mask_Select(train_dataset,filter_mask),
+	train_loader_init = torch.utils.data.DataLoader(dataset=train_dataset,
 													batch_size=128,
 													num_workers=32,
-													shuffle=True,pin_memory=False)
-	# first stage
-	else:
-		train_loader_init = torch.utils.data.DataLoader(dataset=train_dataset,
-														batch_size=128,
-														num_workers=32,
-														shuffle=True, pin_memory=False)
-		stage = 1
+													shuffle=True, pin_memory=False)
+	stage = 1
 	save_checkpoint=args.network+'_'+args.dataset+'_'+args.noise_type+str(args.noise_rate)+'.pt'
-	if filter_mask is not None:	# third stage
-		print ("restore model from %s.pt"%save_checkpoint)
-		network.load_state_dict(torch.load(save_checkpoint))
+
 	ndata = train_dataset.__len__()
 	optimizer1 = torch.optim.SGD(network.parameters(), lr=0.01, momentum=0.9, weight_decay=5e-4)
 	criterion = torch.nn.CrossEntropyLoss(reduce=False, ignore_index=-1).cuda()
@@ -130,10 +122,12 @@ def first_stage(network,test_loader,filter_mask=None):
 		# train models
 		globals_loss = 0
 		network.train()
+		
 		with torch.no_grad():
 			accuracy = evaluate(test_loader, network)
 		example_loss = np.zeros_like(noise_or_not, dtype=float) #sample 개수만큼 길이 가진 example_loss vector 생성
-		lr=adjust_learning_rate(optimizer1,epoch,args.n_epoch1) #lr 조정
+		lr=adjust_learning_rate(optimizer1,epoch,args.n_epoch1)
+
 		for i, (images, labels, indexes) in enumerate(train_loader_init):
 			images = Variable(images).cuda()
 			labels = Variable(labels).cuda()
@@ -150,11 +144,13 @@ def first_stage(network,test_loader,filter_mask=None):
 			optimizer1.zero_grad()
 			loss_1.backward()
 			optimizer1.step()
+
 		print ("Stage %d - " % stage, "epoch:%d" % epoch, "lr:%f" % lr, "train_loss:", globals_loss /ndata, "test_accuarcy:%f" % accuracy)
-		if filter_mask is None:
-			torch.save(network.state_dict(), save_checkpoint)
+		torch.save(network.state_dict(), save_checkpoint)
 
-
+"""
+Second Stage
+"""
 def second_stage(network,test_loader,max_epoch=args.n_epoch2):
 	train_loader_detection = torch.utils.data.DataLoader(dataset=train_dataset,
 											   batch_size=16,
@@ -242,12 +238,16 @@ sys.stdout = Logger(output_d)
 print(args)
 
 basenet= CNN(input_channel=input_channel, n_outputs=num_classes).cuda()
+
 test_loader = torch.utils.data.DataLoader(
 	dataset=test_dataset,batch_size=128,
 	num_workers=32,shuffle=False, pin_memory=False)
-first_stage(network=basenet,test_loader=test_loader)
-filter_mask, ind_1_sorted = second_stage(network=basenet,test_loader=test_loader)
-third_stage(args, noise_or_not=noise_or_not, network=basenet,train_dataset=train_dataset, test_loader=test_loader, filter_mask=filter_mask, idx_sorted=ind_1_sorted.tolist())
-#First stage --> get Filter mask from second stage --> first stage with Filter mask
-# 마지막 단계: first stage with Filter mask를 curriculum learning with ricap으로 바꾸면 될듯
 
+#1
+first_stage(network=basenet,test_loader=test_loader)
+#2
+filter_mask, ind_1_sorted = second_stage(network=basenet,test_loader=test_loader)
+#3
+third_stage(args, noise_or_not=noise_or_not, network=basenet,train_dataset=train_dataset, test_loader=test_loader, filter_mask=filter_mask, idx_sorted=ind_1_sorted.tolist())
+
+#First stage --> get Filter mask from second stage --> first stage with Filter mask

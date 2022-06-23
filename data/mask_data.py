@@ -2,6 +2,7 @@ from  torch.utils import data
 from  PIL import  Image
 import numpy as np
 from  io import BytesIO
+
 class Mask_Select(data.Dataset):
     def __init__(self, origin_dataset,mask_index, idx_sorted, curriculum):
         self.transform = origin_dataset.transform
