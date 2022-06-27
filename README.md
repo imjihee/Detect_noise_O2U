@@ -1,20 +1,25 @@
-### noisy label detection implementation
+### Noisy Label Detection Implementation
 O2U-Net + some modifications
 
 O2U-Net implementation source git: [link](https://github.com/hjimce/O2U-Net)
 
-<img src="https://github.com/imjihee/Detect_noise_loss/image/flow.jpg" width="500" height="200">
+<p align="center">
+  <img src="image/flow.jpg" width="600" height="250" />
+</p>
 
+<p align="center">
+  <img src="image/lr_scheduling.jpg" width="600" height="250" />
+</p>
+     
+#### Usage Example
 ```shell
-python main.py --network=resnet50 --noise_rate 0.6 --remove_rate 0.8
+noise detection run：python main.py  --network=resnet101 --transforms=true
 ```
 
-* noise_accuracy: number of noisy data among data to be removed / total noisy data
-* noise_or_not; binary array. [0: noisy, 1: not a noisy data]
+<br/>
 
 ---
-#### my logs
-***
+#### My Logs
 
 2022/05
 1. Remove Caffe2 thread-pool leak warning: [link](https://github.com/pytorch/pytorch/commit/567e6d3a8766133f384eb1e00635b21ed638d187)
@@ -30,3 +35,4 @@ epoch:10 lr:0.009100 train_loss: 3.1395677614974975 test_accuarcy:55.330000 nois
 2. third stage: *curriculum.py* : apply curriculum learning with masked dataset
 3. mod save directory
 4. Usage: python main.py  --network=resnet50  --noise_rate 0.6 --remove_rate 0.8
+5. Add readme flow.jpg image
