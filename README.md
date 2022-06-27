@@ -8,7 +8,7 @@ O2U-Net implementation source git: [link](https://github.com/hjimce/O2U-Net)
 </p>
 
 <p align="center">
-  <img src="image/lr_scheduling.jpg" width="600" height="250" />
+  <img src="image/lr_scheduling.png" width="400" height="150" />
 </p>
      
 #### Usage Example
