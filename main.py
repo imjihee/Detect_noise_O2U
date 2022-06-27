@@ -26,7 +26,7 @@ parser.add_argument('--fname',type=str, default = "", help='log folder name')
 
 parser.add_argument('--dataset', type = str, help = 'mnist, minimagenet, cifar10, cifar100', default = 'cifar10')
 parser.add_argument('--n_epoch1', type=int, default=10) #train epoch for stage 1. minimum 1
-parser.add_argument('--n_epoch2', type=int, default=150) #train epoch for stage 2. original 250. minimum 2
+parser.add_argument('--n_epoch2', type=int, default=120) #train epoch for stage 2. original 250. minimum 2
 parser.add_argument('--n_epoch3', type=int, default=200) #train epoch for stage 3. minimum 1
 parser.add_argument('--seed', type=int, default=2)
 
@@ -101,6 +101,7 @@ else:
 	remove_rate=args.remove_rate
 #
 noise_or_not = train_dataset.noise_or_not
+#print("*****", np.sum(noise_or_not))
 
 """
 First Stage
@@ -170,8 +171,9 @@ def second_stage(network,test_loader,max_epoch=args.n_epoch2):
 			accuracy=evaluate(test_loader, network)
 		example_loss= np.zeros_like(noise_or_not,dtype=float)
 
-		t = (epoch % 10 + 1) / float(10)
-		lr = (1 - t) * 0.01 + t * 0.001
+		#Learning Rate Scheduling
+		t = (epoch % 40 + 1) / float(10) #40: lr frequency
+		lr = (1 - t) * 0.1 + t * 0.001 #default _ 0.01: max, 0.001: min lr
 
 		for param_group in optimizer1.param_groups:
 			param_group['lr'] = lr
@@ -193,16 +195,17 @@ def second_stage(network,test_loader,max_epoch=args.n_epoch2):
 			optimizer1.zero_grad()
 			loss_1.backward()
 			optimizer1.step() #training in an epoch finish
-		example_loss=example_loss - example_loss.mean()
-		moving_loss_dic=moving_loss_dic+example_loss #moving_loss_dic: ndarray, (50000,0)
 
-		ind_1_sorted = np.argsort(moving_loss_dic)
+		example_loss = example_loss - example_loss.mean()
+		moving_loss_dic = moving_loss_dic+example_loss #moving_loss_dic: ndarray, (50000,0)
+
+		ind_1_sorted = np.argsort(moving_loss_dic) #moving_loss_dic를 오름차순 정렬하는 인덱스의 array 반환.
 		loss_1_sorted = moving_loss_dic[ind_1_sorted]
-		#loss 오름차순 순서대로 loss_1_sorted에 저장됨. loss 오름차순 순서의 인덱스가 ind_1_sorted에 저장됨.
-		remember_rate = 1 - remove_rate
+		#loss 오름차순 순서대로 loss_1_sorted에 저장됨. ind_1_sorted에는 loss 오름차순 순서의 인덱스가 저장됨.
+		remember_rate = 1 - remove_rate #남길 데이터 비율
 		num_remember = int(remember_rate * len(loss_1_sorted)) #num_remember: 40000 @ remove_rate=0.2
 
-		noise_accuracy=np.sum(noise_or_not[ind_1_sorted[num_remember:]]) / float(len(loss_1_sorted)-num_remember)
+		noise_accuracy=np.sum(noise_or_not[ind_1_sorted[num_remember:]]) / float(len(loss_1_sorted)-num_remember) #제거할 데이터 중 노이즈 개수 / 총 노이즈 개수
 		mask = np.ones_like(noise_or_not,dtype=np.float32)
 		mask[ind_1_sorted[num_remember:]]=0 #지워야 할 인덱스에 대해 0 저장. mask[idx]=0
 

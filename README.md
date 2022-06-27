@@ -6,8 +6,11 @@ O2U-Net implementation source git: [link](https://github.com/hjimce/O2U-Net)
 <img src="https://github.com/imjihee/Detect_noise_loss/image/flow.jpg" width="500" height="200">
 
 ```shell
-noise detection run：python main.py  --network=resnet101 --transforms=true
+python main.py --network=resnet50 --noise_rate 0.6 --remove_rate 0.8
 ```
+
+* noise_accuracy: number of noisy data among data to be removed / total noisy data
+* noise_or_not; binary array. [0: noisy, 1: not a noisy data]
 
 ---
 #### my logs
