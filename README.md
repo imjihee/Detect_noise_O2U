@@ -4,16 +4,19 @@ O2U-Net + some modifications
 O2U-Net implementation source git: [link](https://github.com/hjimce/O2U-Net)
 
 <p align="center">
-  <img src="image/flow.jpg" width="600" height="250" />
+  <img src="image/flow.jpg" width="600" height="230" />
 </p>
 
 <p align="center">
-  <img src="image/lr_scheduling.png" width="400" height="150" />
+  <img src="image/lr_scheduling.png" width="500" height="250" />
 </p>
      
 #### Usage Example
 ```shell
-noise detection run：python main.py  --network=resnet101 --transforms=true
+python main.py  --network=resnet50  --noise_rate 0.6 --remove_rate 0.8
+
+(test)
+python main.py  --network=resnet50 --noise_rate 0.6 --remove_rate 0.85 --n_epoch1 1 --n_epoch2 2 --n_epoch3 2
 ```
 
 <br/>

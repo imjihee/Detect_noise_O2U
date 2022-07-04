@@ -51,9 +51,10 @@ class CIFAR10(data.Dataset):
 		 noise_type=None, noise_rate=0.2, random_state=0):
 		self.root = os.path.expanduser(root)
 		self.transform = transform
-		self.target_transform = target_transform
+		self.target_transform = target_transform #NONE
 		self.train = train  # training set or test set
 		self.dataset='cifar10'
+		self.tf = False
 
 		self.noise_type=noise_type
 		self.nb_classes=10
@@ -87,6 +88,7 @@ class CIFAR10(data.Dataset):
 			self.train_data = np.concatenate(self.train_data)
 			self.train_data = self.train_data.reshape((50000, 3, 32, 32))
 			self.train_data = self.train_data.transpose((0, 2, 3, 1))  # convert to HWC
+
 			#if noise_type is not None:
 			if noise_type !='clean':
 				# noisify train data
@@ -95,7 +97,9 @@ class CIFAR10(data.Dataset):
 				self.train_noisy_labels=[i[0] for i in self.train_noisy_labels]
 				_train_labels=[i[0] for i in self.train_labels]
 				self.noise_or_not = np.transpose(self.train_noisy_labels)==np.transpose(_train_labels)
-		else:
+
+		#if test
+		else: 
 			f = self.test_list[0][0]
 			file = os.path.join(self.root, self.base_folder, f)
 			fo = open(file, 'rb')
@@ -132,11 +136,14 @@ class CIFAR10(data.Dataset):
 		# to return a PIL Image
 		img = Image.fromarray(img)
 
-		if self.transform is not None:
+		if (self.transform is not None) and (not self.tf):
 			img = self.transform(img)
+		else:
+			print("***")
+			img = self.target_transform(img)
 
-		if self.target_transform is not None:
-			target = self.target_transform(target)
+		#if self.target_transform is not None:
+		#	target = self.target_transform(target)
 
 		return img, target, index
 
@@ -185,6 +192,14 @@ class CIFAR10(data.Dataset):
 		fmt_str += '{0}{1}'.format(tmp, self.target_transform.__repr__().replace('\n', '\n' + ' ' * len(tmp)))
 		return fmt_str
 
+	def transf(self):
+		self.tf = True
+		print("-- use customized transform(target_transforms) --")
+
+
+
+
+""" CIFAR 100 """
 class CIFAR100(data.Dataset):
 	"""`CIFAR100 <https://www.cs.toronto.edu/~kriz/cifar.html>`_ Dataset.
 

@@ -12,6 +12,7 @@ from torch.autograd import Variable
 import torchvision.transforms as transforms
 from data.cifar import CIFAR10, CIFAR100
 from data.mask_data import Mask_Select
+import albumentation
 
 from curriculum import third_stage
 from utils import evaluate, adjust_learning_rate
@@ -46,12 +47,21 @@ torch.cuda.manual_seed(args.seed)
 network_map={'resnet50':ResNet50,'resnet101':ResNet101}
 CNN=network_map[args.network]
 
-
+"""
+Transforms
+"""
 transforms_map32 = {"true": transforms.Compose([
 	transforms.RandomCrop(32, padding=4),
 	transforms.RandomHorizontalFlip(),
 	transforms.ToTensor()]), 'false': transforms.Compose([transforms.ToTensor()])}
+
 transformer = transforms_map32[args.transforms]
+
+target_transformer = transforms.Compose([
+	transforms.RandomHorizontalFlip(),
+	albumentation.ShiftScaleRotate(args),
+])
+
 
 #load dataset
 if args.dataset=='cifar10':
@@ -63,8 +73,9 @@ if args.dataset=='cifar10':
 								download=True,
 								train=True,
 								transform=transformer,
+								target_transform=target_transformer,
 								noise_type=args.noise_type,
-				noise_rate=args.noise_rate
+								noise_rate=args.noise_rate
 					)
 
 	test_dataset = CIFAR10(root=args.result_dir,
@@ -72,7 +83,7 @@ if args.dataset=='cifar10':
 								train=False,
 								transform=transforms.ToTensor(),
 								noise_type=args.noise_type,
-					noise_rate=args.noise_rate
+								noise_rate=args.noise_rate
 					)
 
 if args.dataset=='cifar100':
@@ -84,6 +95,7 @@ if args.dataset=='cifar100':
 								download=True,
 								train=True,
 								transform=transformer,
+								target_transform=target_transformer,
 								noise_type=args.noise_type,
 				noise_rate=args.noise_rate
 					)
@@ -118,7 +130,8 @@ def first_stage(network,test_loader):
 	ndata = train_dataset.__len__()
 	optimizer1 = torch.optim.SGD(network.parameters(), lr=0.01, momentum=0.9, weight_decay=5e-4)
 	criterion = torch.nn.CrossEntropyLoss(reduce=False, ignore_index=-1).cuda()
-	
+
+	print("----------- Start First Stage -----------")
 	for epoch in range(1, args.n_epoch1):
 		# train models
 		globals_loss = 0
@@ -163,6 +176,7 @@ def second_stage(network,test_loader,max_epoch=args.n_epoch2):
 	moving_loss_dic=np.zeros_like(noise_or_not)
 	ndata = train_dataset.__len__()
 
+	print("----------- Start Second Stage -----------")
 	for epoch in range(1, max_epoch):
 		# train models
 		globals_loss=0

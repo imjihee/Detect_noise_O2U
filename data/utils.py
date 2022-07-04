@@ -100,7 +100,7 @@ def multiclass_noisify(y, P, random_state=0):
     It expects a number between 0 and the number of classes - 1.
     """
     print(np.max(y), P.shape[0])
-    assert P.shape[0] == P.shape[1]
+    assert P.shape[0] == P.shape[1] # pass if they are the same
     assert np.max(y) < P.shape[0]
 
     # row stochastic matrix
@@ -165,7 +165,7 @@ def noisify_multiclass_symmetric(y_train, noise, random_state=None, nb_classes=1
                                            random_state=random_state)
         actual_noise = (y_train_noisy != y_train).mean()
         assert actual_noise > 0.0
-        print('Actual noise %.2f' % actual_noise)
+        print('Actual noise %.2f' % actual_noise) #actual noise: actual noise rate
         y_train = y_train_noisy
     print(P)
 
@@ -176,4 +176,5 @@ def noisify(dataset='mnist', nb_classes=10, train_labels=None, noise_type=None, 
         train_noisy_labels, actual_noise_rate = noisify_pairflip(train_labels, noise_rate, random_state=0, nb_classes=nb_classes)
     if noise_type == 'symmetric':
         train_noisy_labels, actual_noise_rate = noisify_multiclass_symmetric(train_labels, noise_rate, random_state=0, nb_classes=nb_classes)
+    print("----------- Noisy Labeling Finish -----------")
     return train_noisy_labels, actual_noise_rate

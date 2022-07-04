@@ -20,6 +20,8 @@ def third_stage(args, noise_or_not, network, train_dataset, test_loader, filter_
         sf = False #sf: shuffle
     else:
         sf = True
+
+    train_dataset.transf()
     train_loader_init = torch.utils.data.DataLoader(dataset=Mask_Select(train_dataset, filter_mask, idx_sorted, args.curriculum),
                                                     batch_size=128,
                                                     num_workers=32,
@@ -32,6 +34,8 @@ def third_stage(args, noise_or_not, network, train_dataset, test_loader, filter_
     ndata = train_dataset.__len__()
     optimizer1 = torch.optim.SGD(network.parameters(), lr=0.01, momentum=0.9, weight_decay=5e-4)
     criterion = torch.nn.CrossEntropyLoss(reduce=False, ignore_index=-1).cuda()
+
+    print("----------- Start Third Stage -----------")
 
     for epoch in range(1, args.n_epoch3):
         # train models
