@@ -16,10 +16,9 @@ def third_stage(args, noise_or_not, network, train_dataset, test_loader, filter_
     stage = 3
     test_acc = []
     train_loss = []
+    sf = True
     if args.curriculum:
         sf = False #sf: shuffle
-    else:
-        sf = True
 
     train_dataset.transf()
     train_loader_init = torch.utils.data.DataLoader(dataset=Mask_Select(train_dataset, filter_mask, idx_sorted, args.curriculum),

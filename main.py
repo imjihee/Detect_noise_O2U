@@ -13,6 +13,7 @@ import torchvision.transforms as transforms
 from data.cifar import CIFAR10, CIFAR100
 from data.mask_data import Mask_Select
 import albumentation
+import albumentations
 
 from curriculum import third_stage
 from utils import evaluate, adjust_learning_rate
@@ -33,7 +34,7 @@ parser.add_argument('--seed', type=int, default=2)
 
 parser.add_argument('--batch_size', type=int, default=128)
 parser.add_argument('--network', type=str, default="resnet50")
-parser.add_argument('--transforms', type=str, default="false")
+parser.add_argument('--transforms', type=str, default="true")
 
 parser.add_argument('--unstabitily_batch', type=int, default=16)
 
@@ -48,18 +49,21 @@ network_map={'resnet50':ResNet50,'resnet101':ResNet101}
 CNN=network_map[args.network]
 
 """
-Transforms
+Transforms: PIL -> transform(PIL-> ... ->ToTensor) -> return tensor
 """
 transforms_map32 = {"true": transforms.Compose([
-	transforms.RandomCrop(32, padding=4),
-	transforms.RandomHorizontalFlip(),
-	transforms.ToTensor()]), 'false': transforms.Compose([transforms.ToTensor()])}
+	albumentation.RandomHorizontalFlip(),
+	albumentation.ShiftScaleRotate(),
+	transforms.ToTensor()
+	]), 
+	'false': transforms.Compose([transforms.ToTensor()])}
 
 transformer = transforms_map32[args.transforms]
 
 target_transformer = transforms.Compose([
-	transforms.RandomHorizontalFlip(),
-	albumentation.ShiftScaleRotate(args),
+	albumentation.RandomHorizontalFlip(),
+	albumentation.ShiftScaleRotate(),
+	transforms.ToTensor()
 ])
 
 
@@ -130,8 +134,10 @@ def first_stage(network,test_loader):
 	ndata = train_dataset.__len__()
 	optimizer1 = torch.optim.SGD(network.parameters(), lr=0.01, momentum=0.9, weight_decay=5e-4)
 	criterion = torch.nn.CrossEntropyLoss(reduce=False, ignore_index=-1).cuda()
-
-	print("----------- Start First Stage -----------")
+	if args.n_epoch1 == 1:
+		print("----------- SKIP First Stage -----------")
+	else:
+		print("----------- Start First Stage -----------")
 	for epoch in range(1, args.n_epoch1):
 		# train models
 		globals_loss = 0

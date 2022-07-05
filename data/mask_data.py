@@ -2,7 +2,9 @@ from  torch.utils import data
 from  PIL import  Image
 import numpy as np
 from  io import BytesIO
-
+"""
+Select data with small loss
+"""
 class Mask_Select(data.Dataset):
     def __init__(self, origin_dataset,mask_index, idx_sorted, curriculum):
         self.transform = origin_dataset.transform
@@ -53,12 +55,12 @@ class Mask_Select(data.Dataset):
         if self.dataname!='MinImagenet':
             img = Image.fromarray(img)
 
+        #if self.transform is not None:
+        #    img = self.transform(img)
 
-        if self.transform is not None:
-            img = self.transform(img)
-
-        if self.target_transform is not None:
-            target = self.target_transform(target)
+        #if self.target_transform is not None:
+        #    target = self.target_transform(target)
+        img = self.target_transform(img)
 
         return img, target, index
 

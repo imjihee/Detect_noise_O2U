@@ -51,7 +51,7 @@ class CIFAR10(data.Dataset):
 		 noise_type=None, noise_rate=0.2, random_state=0):
 		self.root = os.path.expanduser(root)
 		self.transform = transform
-		self.target_transform = target_transform #NONE
+		self.target_transform = target_transform
 		self.train = train  # training set or test set
 		self.dataset='cifar10'
 		self.tf = False
@@ -136,7 +136,7 @@ class CIFAR10(data.Dataset):
 		# to return a PIL Image
 		img = Image.fromarray(img)
 
-		if (self.transform is not None) and (not self.tf):
+		if not self.tf:
 			img = self.transform(img)
 		else:
 			print("***")
@@ -193,8 +193,8 @@ class CIFAR10(data.Dataset):
 		return fmt_str
 
 	def transf(self):
-		self.tf = True
 		print("-- use customized transform(target_transforms) --")
+		self.tf = True
 
 
 
