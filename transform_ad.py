@@ -1,6 +1,7 @@
 import yacs.config
 import numpy as np
 import PIL.Image
+import PIL, PIL.ImageOps
 import random
 import torchvision
 import albumentations #https://pypi.org/project/albumentations/
@@ -70,14 +71,69 @@ Translations (with torchvision.transforms functions)
 """
 
 class TranslateX:
-    def __init__(self):
-        self.v = (random.random() - 0.5) * 0.8
-        self.v = self.v * 32
+    def __init__(self, p):
+        self.v = ((random.random() - 0.5) * 0.8) * 32
+        self.p = p
     def __call__(self, data: PIL.Image.Image) -> PIL.Image.Image:
-        v = self.v
-        temp = data.transform(data.size, PIL.Image.AFFINE, (1, 0, v, 0, 1, 0))
-        #if self.v>0.35:
-        #    temp.save('image/translatex.png')
-        return temp
+        if random.random() < self.p:
+            data = data.transform(data.size, PIL.Image.AFFINE, (1, 0, self.v, 0, 1, 0))
+        return data
+
+class TranslateY:
+    def __init__(self, p):
+        self.v = ((random.random() - 0.5) * 0.8) * 32
+        self.p = p
+    def __call__(self, data: PIL.Image.Image) -> PIL.Image.Image:
+        if random.random() < self.p:
+            data = data.transform(data.size, PIL.Image.AFFINE, (1, 0, 0, 0, 1, self.v))
+        return data
 
 class Flip:
+    def __init__(self, p):
+        self.p = p
+    def __call__(self, data: PIL.Image.Image) -> PIL.Image.Image:
+        if random.random() < self.p:
+            data = PIL.ImageOps.mirror(data)
+        return data
+
+class Rotate:
+    def __init__(self, p):
+        self.p = p
+    def __call__(self, data: PIL.Image.Image) -> PIL.Image.Image:
+        if random.random() < self.p:
+            if random.random() > 0.5:
+                data = data.rotate(30)
+            else:
+                data = data.rotate(-30)
+        return data
+
+class Posterize:
+    def __init__(self, p):
+        self.p = p
+    def __call__(self, data: PIL.Image.Image) -> PIL.Image.Image:
+        if random.random() < self.p:
+            if random.random()>0.5:
+                data = PIL.ImageOps.posterize(data, 4)
+            else:
+                data = PIL.ImageOps.posterize(data, 5)
+        return data
+
+class AutoContrast:
+    def __init__(self, p):
+        self.p = p
+    def __call__(self, data: PIL.Image.Image) -> PIL.Image.Image:
+        if random.random() < self.p:
+            data = PIL.ImageOps.autocontrast(data)
+        return data
+
+"""
+class :
+    def __init__(self, p):
+        self.p = p
+    def __call__(self, data: PIL.Image.Image) -> PIL.Image.Image:
+        if random.random() > self.p:
+            data = 
+        return data
+        
+img.save('-.png')
+"""

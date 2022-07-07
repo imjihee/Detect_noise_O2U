@@ -39,3 +39,9 @@ epoch:10 lr:0.009100 train_loss: 3.1395677614974975 test_accuarcy:55.330000 nois
 3. mod save directory
 4. Usage: python main.py  --network=resnet50  --noise_rate 0.6 --remove_rate 0.8
 5. Add readme flow.jpg image
+
+2022/07
+1. transform_ad.py: add more transform operations
+```shell
+TranslateX, TranslateY, Flip, Rotate, Posterize, AutoContrast
+```

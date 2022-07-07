@@ -12,7 +12,7 @@ from torch.autograd import Variable
 import torchvision.transforms as transforms
 from data.cifar import CIFAR10, CIFAR100
 from data.mask_data import Mask_Select
-import albumentation
+import transform_ad
 import albumentations
 
 from curriculum import third_stage
@@ -52,8 +52,9 @@ CNN=network_map[args.network]
 Transforms: PIL -> transform(PIL-> ... ->ToTensor) -> return tensor
 """
 transforms_map32 = {"true": transforms.Compose([
-	albumentation.RandomHorizontalFlip(),
-	albumentation.ShiftScaleRotate(),
+	#albumentation.RandomHorizontalFlip(),
+	transforms.RandomHorizontalFlip(),
+	transform_ad.TranslateX(p=0.3),
 	transforms.ToTensor()
 	]), 
 	'false': transforms.Compose([transforms.ToTensor()])}
@@ -61,8 +62,7 @@ transforms_map32 = {"true": transforms.Compose([
 transformer = transforms_map32[args.transforms]
 
 target_transformer = transforms.Compose([
-	albumentation.RandomHorizontalFlip(),
-	albumentation.ShiftScaleRotate(),
+	transforms.RandomHorizontalFlip(),
 	transforms.ToTensor()
 ])
 
@@ -125,9 +125,9 @@ First Stage
 def first_stage(network,test_loader):
 
 	train_loader_init = torch.utils.data.DataLoader(dataset=train_dataset,
-													batch_size=128,
-													num_workers=32,
-													shuffle=True, pin_memory=False)
+													batch_size=64,
+													num_workers=1,
+													shuffle=True, pin_memory=True)
 	stage = 1
 	save_checkpoint=args.network+'_'+args.dataset+'_'+args.noise_type+str(args.noise_rate)+'.pt'
 
@@ -174,7 +174,7 @@ Second Stage
 def second_stage(network,test_loader,max_epoch=args.n_epoch2):
 	train_loader_detection = torch.utils.data.DataLoader(dataset=train_dataset,
 											   batch_size=16,
-											   num_workers=32,
+											   num_workers=1,
 											   shuffle=True,
 														 )
 	optimizer1 = torch.optim.SGD(network.parameters(), lr=0.01, momentum=0.9, weight_decay=5e-4)
@@ -264,7 +264,7 @@ basenet= CNN(input_channel=input_channel, n_outputs=num_classes).cuda()
 
 test_loader = torch.utils.data.DataLoader(
 	dataset=test_dataset,batch_size=128,
-	num_workers=32,shuffle=False, pin_memory=False)
+	num_workers=1,shuffle=False, pin_memory=False)
 
 #1
 first_stage(network=basenet,test_loader=test_loader)
