@@ -55,6 +55,7 @@ transforms_map32 = {"true": transforms.Compose([
 	#albumentation.RandomHorizontalFlip(),
 	transforms.RandomHorizontalFlip(),
 	transform_ad.TranslateX(p=0.3),
+	transform_ad.Posterize(p=0.2),
 	transforms.ToTensor()
 	]), 
 	'false': transforms.Compose([transforms.ToTensor()])}
@@ -63,6 +64,8 @@ transformer = transforms_map32[args.transforms]
 
 target_transformer = transforms.Compose([
 	transforms.RandomHorizontalFlip(),
+	transform_ad.TranslateX(p=0.3),
+	transform_ad.Posterize(p=0.2),
 	transforms.ToTensor()
 ])
 
@@ -192,8 +195,8 @@ def second_stage(network,test_loader,max_epoch=args.n_epoch2):
 		example_loss= np.zeros_like(noise_or_not,dtype=float)
 
 		#Learning Rate Scheduling
-		t = (epoch % 40 + 1) / float(10) #40: lr frequency
-		lr = (1 - t) * 0.1 + t * 0.001 #default _ 0.01: max, 0.001: min lr
+		t = (epoch % 10 + 1) / float(10) #40: lr frequency
+		lr = (1 - t) * 0.01 + t * 0.001 #default _ 0.01: max, 0.001: min lr
 
 		for param_group in optimizer1.param_groups:
 			param_group['lr'] = lr
