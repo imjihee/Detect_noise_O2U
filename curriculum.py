@@ -6,6 +6,7 @@ from data.mask_data import Mask_Select
 from utils import evaluate, adjust_learning_rate
 import datetime
 from pytz import timezone
+from .ricap_collator import RICAPCollactor
 
 
 """
@@ -19,11 +20,14 @@ def third_stage(args, noise_or_not, network, train_dataset, test_loader, filter_
     sf = True
     if args.curriculum:
         sf = False #sf: shuffle
-
+    collator = None
+    if args.use_ricap:
+        collator = RICAPCollactor
     train_dataset.transf()
     train_loader_init = torch.utils.data.DataLoader(dataset=Mask_Select(train_dataset, filter_mask, idx_sorted, args.curriculum),
                                                     batch_size=128,
                                                     num_workers=32,
+                                                    collate_fn=collator,
                                                     shuffle=sf, pin_memory=False)
 
     #save_checkpoint = args.network + '_' + args.dataset + '_' + args.noise_type + str(args.noise_rate) + '.pt'
@@ -68,6 +72,7 @@ def third_stage(args, noise_or_not, network, train_dataset, test_loader, filter_
 
     log_data = np.concatenate(([train_loss], [test_acc]), axis=0)
     export_toexcel(args, log_data)
+    print("** stage 3 max test accuracy:", max(test_acc))
 
 
 def export_toexcel(args, data):

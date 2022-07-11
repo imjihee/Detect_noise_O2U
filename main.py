@@ -19,6 +19,9 @@ from curriculum import third_stage
 from utils import evaluate, adjust_learning_rate
 from resnet import ResNet50, ResNet101
 
+import torch.nn as nn
+import torchvision.models as torchvision_models
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--result_dir', type = str, help = 'dir to save result txt files', default = '../results/')
 parser.add_argument('--noise_rate', type = float, help = 'corruption rate, should be less than 1', default = 0.3)
@@ -62,10 +65,11 @@ transforms_map32 = {"true": transforms.Compose([
 
 transformer = transforms_map32[args.transforms]
 
+#target_transformer: transform operations for
 target_transformer = transforms.Compose([
-	transforms.RandomHorizontalFlip(),
-	transform_ad.TranslateX(p=0.3),
-	transform_ad.Posterize(p=0.2),
+	#transforms.RandomHorizontalFlip(),
+	#transform_ad.TranslateX(p=0.3),
+	#transform_ad.Posterize(p=0.2),
 	transforms.ToTensor()
 ])
 
@@ -262,8 +266,21 @@ args.fname = output_d
 sys.stdout = Logger(output_d)
 
 print(args)
-
+print("** Transforms for STAGE 2:", transformer)
+print("** Transforms for STAGE 3:", target_transformer)
 basenet= CNN(input_channel=input_channel, n_outputs=num_classes).cuda()
+
+"""
+if num_classes == 10:
+	fc_out = 10
+elif num_classes == 100:
+	fc_out = 100
+
+basenet = torchvision_models.resnet50(pretrained=True)
+fc_in = basenet.fc.in_features
+basenet.fc = nn.Linear(fc_in, fc_out)
+#basenet.load_state_dict(pretrain.state_dict(), strict = False)
+"""
 
 test_loader = torch.utils.data.DataLoader(
 	dataset=test_dataset,batch_size=128,
