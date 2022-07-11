@@ -42,6 +42,7 @@ parser.add_argument('--transforms', type=str, default="true")
 parser.add_argument('--unstabitily_batch', type=int, default=16)
 
 parser.add_argument('--curriculum', action='store_true')
+parser.add_argument('--use_ricap', action='store_true')
 args = parser.parse_args()
 print(args)
 # Seed
@@ -53,19 +54,19 @@ CNN=network_map[args.network]
 
 """
 Transforms: PIL -> transform(PIL-> ... ->ToTensor) -> return tensor
+transforms_map32: transform operations for 2nd stage
+target_transformer: transform operations for 3rd stage
 """
 transforms_map32 = {"true": transforms.Compose([
 	#albumentation.RandomHorizontalFlip(),
-	transforms.RandomHorizontalFlip(),
-	transform_ad.TranslateX(p=0.3),
-	transform_ad.Posterize(p=0.2),
+	#transforms.RandomHorizontalFlip(),
+	#transform_ad.TranslateX(p=0.3),
+	#transform_ad.Posterize(p=0.2),
 	transforms.ToTensor()
 	]), 
 	'false': transforms.Compose([transforms.ToTensor()])}
-
 transformer = transforms_map32[args.transforms]
 
-#target_transformer: transform operations for
 target_transformer = transforms.Compose([
 	#transforms.RandomHorizontalFlip(),
 	#transform_ad.TranslateX(p=0.3),

@@ -3,6 +3,8 @@ from typing import List, Tuple
 import numpy as np
 import torch
 import yacs.config
+import torch
+import torch.nn as nn
 
 def ricap(
     batch: Tuple[torch.Tensor, torch.Tensor], beta: float
@@ -43,3 +45,16 @@ class RICAPCollactor:
         batch = torch.utils.data.dataloader.default_collate(batch)
         batch = ricap(batch, self.beta)
         return batch
+
+class RICAPloss:
+    def __init__(self):
+        self.loss_func = nn.CrossEntropyLoss(reduction='mean').cuda()
+
+    def __call__(
+            self, predictions: torch.Tensor,
+            targets: Tuple[List[torch.Tensor], List[float]]) -> torch.Tensor:
+        target_list, weights = targets
+        return sum([
+            weight * self.loss_func(predictions, targets)
+            for targets, weight in zip(target_list, weights)
+        ])

@@ -6,7 +6,7 @@ from data.mask_data import Mask_Select
 from utils import evaluate, adjust_learning_rate
 import datetime
 from pytz import timezone
-from .ricap_collator import RICAPCollactor
+from ricap_collator import RICAPCollactor, RICAPloss
 
 
 """
@@ -23,6 +23,10 @@ def third_stage(args, noise_or_not, network, train_dataset, test_loader, filter_
     collator = None
     if args.use_ricap:
         collator = RICAPCollactor
+        criterion = RICAPloss()
+    else:
+        criterion = torch.nn.CrossEntropyLoss(reduce=False, ignore_index=-1).cuda()
+
     train_dataset.transf()
     train_loader_init = torch.utils.data.DataLoader(dataset=Mask_Select(train_dataset, filter_mask, idx_sorted, args.curriculum),
                                                     batch_size=128,
@@ -36,7 +40,6 @@ def third_stage(args, noise_or_not, network, train_dataset, test_loader, filter_
     #network.load_state_dict(torch.load(save_checkpoint))
     ndata = train_dataset.__len__()
     optimizer1 = torch.optim.SGD(network.parameters(), lr=0.01, momentum=0.9, weight_decay=5e-4)
-    criterion = torch.nn.CrossEntropyLoss(reduce=False, ignore_index=-1).cuda()
 
     print("----------- Start Third Stage -----------")
 
