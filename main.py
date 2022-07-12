@@ -27,7 +27,9 @@ parser.add_argument('--result_dir', type = str, help = 'dir to save result txt f
 parser.add_argument('--noise_rate', type = float, help = 'corruption rate, should be less than 1', default = 0.3)
 parser.add_argument('--remove_rate', type = float, help = 'rate of the total dataset to be removed', default = None) 
 parser.add_argument('--noise_type', type = str, help='[pairflip, symmetric]', default='symmetric')
+
 parser.add_argument('--fname',type=str, default = "", help='log folder name')
+parser.add_argument('--time_now',type=str, default = "", help='log time')
 
 parser.add_argument('--dataset', type = str, help = 'mnist, minimagenet, cifar10, cifar100', default = 'cifar10')
 parser.add_argument('--n_epoch1', type=int, default=10) #train epoch for stage 1. minimum 1
@@ -58,10 +60,9 @@ transforms_map32: transform operations for 2nd stage
 target_transformer: transform operations for 3rd stage
 """
 transforms_map32 = {"true": transforms.Compose([
-	#albumentation.RandomHorizontalFlip(),
-	#transforms.RandomHorizontalFlip(),
-	#transform_ad.TranslateX(p=0.3),
-	#transform_ad.Posterize(p=0.2),
+	transforms.RandomHorizontalFlip(),
+	transform_ad.TranslateX(p=0.3),
+	transform_ad.Posterize(p=0.2),
 	transforms.ToTensor()
 	]), 
 	'false': transforms.Compose([transforms.ToTensor()])}
@@ -245,9 +246,8 @@ def second_stage(network,test_loader,max_epoch=args.n_epoch2):
 	return mask, ind_1_sorted[:num_remember] #second stage finish
 
 class Logger(object):
-	def __init__(self, dir):
-		td = datetime.datetime.now(timezone('Asia/Seoul'))
-		file_name = td.strftime('%m-%d_%H.%M') + ".log"
+	def __init__(self, dir, args):
+		file_name = args.time_now + ".log"
 		self.terminal = sys.stdout
 		self.log = open(dir + "/" + file_name, "a")
 
@@ -263,8 +263,10 @@ output_d = "log/" + args.dataset + "/noise_" + str(args.noise_rate) + "_remove_"
 output_dir = pathlib.Path(output_d)
 output_dir.mkdir(exist_ok=True, parents=True)
 args.fname = output_d
+td = datetime.datetime.now(timezone('Asia/Seoul'))
+args.time_now = td.strftime('%m-%d_%H.%M')
 
-sys.stdout = Logger(output_d)
+sys.stdout = Logger(output_d, args)
 
 print(args)
 print("** Transforms for STAGE 2:", transformer)
@@ -276,7 +278,7 @@ if num_classes == 10:
 	fc_out = 10
 elif num_classes == 100:
 	fc_out = 100
-
+# pretrained model
 basenet = torchvision_models.resnet50(pretrained=True)
 fc_in = basenet.fc.in_features
 basenet.fc = nn.Linear(fc_in, fc_out)
@@ -290,8 +292,8 @@ test_loader = torch.utils.data.DataLoader(
 #1
 first_stage(network=basenet,test_loader=test_loader)
 #2
-filter_mask, ind_1_sorted = second_stage(network=basenet,test_loader=test_loader)
+filter_mask, ind_1_sorted = second_stage(network=basenet, test_loader=test_loader)
 #3
-third_stage(args, noise_or_not=noise_or_not, network=basenet,train_dataset=train_dataset, test_loader=test_loader, filter_mask=filter_mask, idx_sorted=ind_1_sorted.tolist())
+third_stage(args, noise_or_not=noise_or_not, network=basenet, train_dataset=train_dataset, test_loader=test_loader, filter_mask=filter_mask, idx_sorted=ind_1_sorted.tolist())
 
 #First stage --> get Filter mask from second stage --> first stage with Filter mask

@@ -6,6 +6,7 @@ from data.mask_data import Mask_Select
 from utils import evaluate, adjust_learning_rate
 import datetime
 from pytz import timezone
+import torch.distributed as dist
 from ricap_collator import RICAPCollactor, RICAPloss
 
 
@@ -20,24 +21,40 @@ def third_stage(args, noise_or_not, network, train_dataset, test_loader, filter_
     sf = True
     if args.curriculum:
         sf = False #sf: shuffle
-    collator = None
-    if args.use_ricap:
-        collator = RICAPCollactor
-        criterion = RICAPloss()
-    else:
-        criterion = torch.nn.CrossEntropyLoss(reduce=False, ignore_index=-1).cuda()
 
     train_dataset.transf()
-    train_loader_init = torch.utils.data.DataLoader(dataset=Mask_Select(train_dataset, filter_mask, idx_sorted, args.curriculum),
-                                                    batch_size=128,
-                                                    num_workers=32,
-                                                    collate_fn=collator,
-                                                    shuffle=sf, pin_memory=False)
+
+    if dist.is_available() and dist.is_initialized():
+        train_sampler = torch.utils.data.distributed.DistributedSampler(
+            train_dataset)
+    else:
+        train_sampler = torch.utils.data.sampler.RandomSampler(
+            train_dataset, replacement=False)
+
+    if args.use_ricap:
+        train_batch_sampler = torch.utils.data.sampler.BatchSampler(
+            train_sampler,
+            batch_size=128,
+            drop_last=True)
+        train_loader_init = torch.utils.data.DataLoader(
+            dataset=Mask_Select(train_dataset, filter_mask, idx_sorted, args.curriculum),
+            batch_sampler=train_batch_sampler,
+            num_workers=32,
+            collate_fn=RICAPCollactor,
+            pin_memory=False)
+        criterion = RICAPloss()
+    else:
+        train_loader_init = torch.utils.data.DataLoader(
+            dataset=Mask_Select(train_dataset, filter_mask, idx_sorted, args.curriculum),
+            batch_size=128,
+            num_workers=32,
+            shuffle=True, pin_memory=False)
+        criterion = torch.nn.CrossEntropyLoss(reduce=False, ignore_index=-1).cuda()
 
     #save_checkpoint = args.network + '_' + args.dataset + '_' + args.noise_type + str(args.noise_rate) + '.pt'
-
     #print("restore model from %s.pt" % save_checkpoint)
     #network.load_state_dict(torch.load(save_checkpoint))
+
     ndata = train_dataset.__len__()
     optimizer1 = torch.optim.SGD(network.parameters(), lr=0.01, momentum=0.9, weight_decay=5e-4)
 
@@ -84,7 +101,7 @@ def export_toexcel(args, data):
     
     td = datetime.datetime.now(timezone('Asia/Seoul'))
 
-    xlsx_path =  args.fname + '/acc_curr_' + str(args.curriculum) + '_' + td.strftime('%m-%d_%H.%M') + '.xlsx'
+    xlsx_path = args.fname + '/acc_curr_' + str(args.curriculum) + '_' + args.time_now + '.xlsx'
     writer1 = pd.ExcelWriter(xlsx_path, engine='xlsxwriter')
 
     df.columns = ['train loss', 'test acc']
