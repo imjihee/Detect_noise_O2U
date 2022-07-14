@@ -4,9 +4,10 @@ import numpy as np
 from  io import BytesIO
 """
 Select data with small loss
+self.train_data, self.train_noisy_labels: cleaned data and label
 """
-class Mask_Select(data.Dataset):
-    def __init__(self, origin_dataset,mask_index, idx_sorted, curriculum):
+class Mask_Select(data.Dataset): 
+    def __init__(self, origin_dataset, mask_index, idx_sorted, curriculum):
         self.transform = origin_dataset.transform
         self.target_transform = origin_dataset.target_transform
         labels=origin_dataset.train_noisy_labels
@@ -18,7 +19,7 @@ class Mask_Select(data.Dataset):
             print("Build Curriculum Dataset")
             self.train_data=[0]*len(labels)
             self.train_noisy_labels=[-1]*len(labels)
-            for i,m in enumerate(mask_index):
+            for i,m in enumerate(mask_index): #mask_index: {index:0/1}
                 if m<0.5:
                     continue
                 #mask=1인 경우
@@ -49,7 +50,8 @@ class Mask_Select(data.Dataset):
         Returns:
             tuple: (image, target) where target is index of the target class.
         """
-
+        if index>45000:
+            print(index)
         img, target = self.train_data[index], self.train_noisy_labels[index]
 
         if self.dataname!='MinImagenet':

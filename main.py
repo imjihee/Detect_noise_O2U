@@ -13,6 +13,7 @@ import torchvision.transforms as transforms
 from data.cifar import CIFAR10, CIFAR100
 from data.mask_data import Mask_Select
 import transform_ad
+import pickle
 import albumentations
 
 from curriculum import third_stage
@@ -45,6 +46,7 @@ parser.add_argument('--unstabitily_batch', type=int, default=16)
 
 parser.add_argument('--curriculum', action='store_true')
 parser.add_argument('--use_ricap', action='store_true')
+parser.add_argument('--test_third', action='store_true')
 args = parser.parse_args()
 print(args)
 # Seed
@@ -242,7 +244,15 @@ def second_stage(network,test_loader,max_epoch=args.n_epoch2):
 		top_accuracy= 1-np.sum(noise_or_not[ind_1_sorted[top_accuracy_rm:]]) / float(len(loss_1_sorted) - top_accuracy_rm)
 
 		print ("Stage 2 - " + "epoch:%d" % epoch, "lr:%f" % lr, "train_loss:", globals_loss / ndata, "test_accuarcy:%f" % accuracy,"noise_accuracy:%f"%(1-noise_accuracy),"top 0.1 noise accuracy:%f"%top_accuracy)
-
+	
+	"""
+	#For args.test_third==True case
+	with open("log/mask","wb") as fp:
+		pickle.dump(mask, fp)
+	with open("log/ind_sorted","wb") as fp:
+		pickle.dump(ind_1_sorted[:num_remember], fp)
+	#"""
+	
 	return mask, ind_1_sorted[:num_remember] #second stage finish
 
 class Logger(object):
@@ -273,7 +283,7 @@ print("** Transforms for STAGE 2:", transformer)
 print("** Transforms for STAGE 3:", target_transformer)
 basenet= CNN(input_channel=input_channel, n_outputs=num_classes).cuda()
 
-"""
+""" pretrain function modifing ing . . .
 if num_classes == 10:
 	fc_out = 10
 elif num_classes == 100:
@@ -291,9 +301,16 @@ test_loader = torch.utils.data.DataLoader(
 
 #1
 first_stage(network=basenet,test_loader=test_loader)
-#2
-filter_mask, ind_1_sorted = second_stage(network=basenet, test_loader=test_loader)
-#3
-third_stage(args, noise_or_not=noise_or_not, network=basenet, train_dataset=train_dataset, test_loader=test_loader, filter_mask=filter_mask, idx_sorted=ind_1_sorted.tolist())
-
+if not args.test_third:
+	#2
+	filter_mask, ind_1_sorted = second_stage(network=basenet, test_loader=test_loader)
+	#3
+	third_stage(args, noise_or_not=noise_or_not, network=basenet, train_dataset=train_dataset, test_loader=test_loader, filter_mask=filter_mask, idx_sorted=ind_1_sorted.tolist())
+else:
+	print("**load pretrained mask from STAGE 2**")
+	with open("log/mask","rb") as fp:
+		filter_mask = pickle.load(fp)
+	with open("log/ind_sorted","rb") as fp:
+		ind_1_sorted = pickle.load(fp)
+	third_stage(args, noise_or_not=noise_or_not, network=basenet, train_dataset=train_dataset, test_loader=test_loader, filter_mask=filter_mask, idx_sorted=ind_1_sorted.tolist())
 #First stage --> get Filter mask from second stage --> first stage with Filter mask

@@ -8,7 +8,10 @@ import datetime
 from pytz import timezone
 import torch.distributed as dist
 from ricap_collator import RICAPCollactor, RICAPloss
+from ricap_trainer import ricap_dataset
 
+def worker_init_fn(worker_id: int) -> None:
+    np.random.seed(np.random.get_state()[1][0] + worker_id)
 
 """
 Third Stage: Curriculum Learning with Relatively Clean Data
@@ -23,13 +26,14 @@ def third_stage(args, noise_or_not, network, train_dataset, test_loader, filter_
         sf = False #sf: shuffle
 
     train_dataset.transf()
+    clean_train_dataset = Mask_Select(train_dataset, filter_mask, idx_sorted, args.curriculum)
 
     if dist.is_available() and dist.is_initialized():
         train_sampler = torch.utils.data.distributed.DistributedSampler(
-            train_dataset)
+            clean_train_dataset)
     else:
         train_sampler = torch.utils.data.sampler.RandomSampler(
-            train_dataset, replacement=False)
+            clean_train_dataset, replacement=False)
 
     if args.use_ricap:
         train_batch_sampler = torch.utils.data.sampler.BatchSampler(
@@ -37,15 +41,17 @@ def third_stage(args, noise_or_not, network, train_dataset, test_loader, filter_
             batch_size=128,
             drop_last=True)
         train_loader_init = torch.utils.data.DataLoader(
-            dataset=Mask_Select(train_dataset, filter_mask, idx_sorted, args.curriculum),
+            dataset=clean_train_dataset,
             batch_sampler=train_batch_sampler,
             num_workers=32,
             collate_fn=RICAPCollactor,
-            pin_memory=False)
+            pin_memory=False,
+            worker_init_fn = worker_init_fn
+            )
         criterion = RICAPloss()
     else:
         train_loader_init = torch.utils.data.DataLoader(
-            dataset=Mask_Select(train_dataset, filter_mask, idx_sorted, args.curriculum),
+            dataset=clean_train_dataset,
             batch_size=128,
             num_workers=32,
             shuffle=True, pin_memory=False)
@@ -107,4 +113,4 @@ def export_toexcel(args, data):
     df.columns = ['train loss', 'test acc']
     df.to_excel(writer1)
     writer1.save()
-    print("SAVE acc.xlsx successfully")
+    print("SAVE " + xlsx_path + " successfully")
