@@ -33,9 +33,10 @@ parser.add_argument('--fname',type=str, default = "", help='log folder name')
 parser.add_argument('--time_now',type=str, default = "", help='log time')
 
 parser.add_argument('--dataset', type = str, help = 'mnist, minimagenet, cifar10, cifar100', default = 'cifar10')
-parser.add_argument('--n_epoch1', type=int, default=10) #train epoch for stage 1. minimum 1
-parser.add_argument('--n_epoch2', type=int, default=120) #train epoch for stage 2. original 250. minimum 2
-parser.add_argument('--n_epoch3', type=int, default=200) #train epoch for stage 3. minimum 1
+parser.add_argument('--n_epoch1', type=int, default=20) #train epoch for stage 1. minimum 1
+parser.add_argument('--n_epoch2', type=int, default=30) #train epoch for stage 2. original 250. minimum 2
+parser.add_argument('--n_epoch3', type=int, default=50) #train epoch for stage 3. minimum 1
+parser.add_argument('--n_epoch4', type=int, default=50) #train epoch for stage 3. minimum 1
 parser.add_argument('--seed', type=int, default=2)
 
 parser.add_argument('--batch_size', type=int, default=128)
@@ -137,7 +138,7 @@ def first_stage(network,test_loader):
 
 	train_loader_init = torch.utils.data.DataLoader(dataset=train_dataset,
 													batch_size=64,
-													num_workers=1,
+													num_workers=32,
 													shuffle=True, pin_memory=True)
 	stage = 1
 	save_checkpoint=args.network+'_'+args.dataset+'_'+args.noise_type+str(args.noise_rate)+'.pt'
@@ -186,7 +187,7 @@ Second Stage
 def second_stage(network,test_loader,max_epoch=args.n_epoch2):
 	train_loader_detection = torch.utils.data.DataLoader(dataset=train_dataset,
 											   batch_size=16,
-											   num_workers=1,
+											   num_workers=32,
 											   shuffle=True,
 														 )
 	optimizer1 = torch.optim.SGD(network.parameters(), lr=0.01, momentum=0.9, weight_decay=5e-4)
@@ -248,7 +249,8 @@ def second_stage(network,test_loader,max_epoch=args.n_epoch2):
 	
 	#"""
 	#For args.test_third==True case
-	with open("log/mask","wb") as fp:
+	mask_path = "log/mask/"+args.dataset+"mask_"+str(args.noise_rate)+"_"+str(args.remove_rate)
+	with open(mask_path,"wb") as fp:
 		pickle.dump(mask, fp)
 	with open("log/ind_sorted","wb") as fp:
 		pickle.dump(ind_1_sorted[:num_remember], fp)
@@ -298,7 +300,7 @@ basenet.fc = nn.Linear(fc_in, fc_out)
 
 test_loader = torch.utils.data.DataLoader(
 	dataset=test_dataset,batch_size=128,
-	num_workers=1,shuffle=False, pin_memory=False)
+	num_workers=32,shuffle=False, pin_memory=False)
 
 #1
 first_stage(network=basenet,test_loader=test_loader)
@@ -311,8 +313,7 @@ else:
 		filter_mask = pickle.load(fp)
 	with open("log/ind_sorted","rb") as fp:
 		ind_1_sorted = pickle.load(fp)
-	#3
-	network, correct_label = third_stage(args, noise_or_not=noise_or_not, network=basenet, train_dataset=train_dataset, test_loader=test_loader, filter_mask=filter_mask, idx_sorted=ind_1_sorted.tolist())
-	#4
-	
-	label_correction(args, network=network, corrected_label =correct_label, train_dataset=train_dataset, test_loader=test_loader)
+#3
+network, correct_label = third_stage(args, noise_or_not=noise_or_not, network=basenet, train_dataset=train_dataset, test_loader=test_loader, filter_mask=filter_mask, idx_sorted=ind_1_sorted.tolist())
+#4
+label_correction(args, network=network, corrected_label =correct_label, train_dataset=train_dataset, test_loader=test_loader)

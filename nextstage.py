@@ -23,6 +23,7 @@ def third_stage(args, noise_or_not, network, train_dataset, test_loader, filter_
     test_acc = []
     train_loss = []
     sf = True
+    light=False
     if args.curriculum:
         sf = False #sf: shuffle
 
@@ -86,6 +87,9 @@ def third_stage(args, noise_or_not, network, train_dataset, test_loader, filter_
             if epoch==args.n_epoch3-1:
                 for pi, cl in zip(indexes, torch.argmax(logits,dim=1)):
                     correct_label[pi] = cl.item()  # save loss of each samples
+                    if light==False:
+                        print("...make correct_label...")
+                        light=True
 
             globals_loss += loss_1.sum().cpu().data.item()
             loss_1 = loss_1.mean()
@@ -94,7 +98,7 @@ def third_stage(args, noise_or_not, network, train_dataset, test_loader, filter_
             loss_1.backward()
             optimizer1.step()
 
-
+        
         print("Stage %d - " % stage, "epoch:%d" % epoch, "lr:%f" % lr, "train_loss:", globals_loss / ndata,
               "test_accuarcy:%f" % accuracy)
 
@@ -107,7 +111,7 @@ def third_stage(args, noise_or_not, network, train_dataset, test_loader, filter_
     return network, correct_label
     
 
-
+#Stage 4
 def label_correction(args, network, corrected_label, train_dataset, test_loader):
     
     stage = 4
@@ -144,17 +148,16 @@ def label_correction(args, network, corrected_label, train_dataset, test_loader)
 
     print("----------- Start Fourth(4) Stage -----------")
 
-    for epoch in range(1, args.n_epoch3):
+    for epoch in range(1, args.n_epoch4):
         # train models
         globals_loss = 0
         network.train()
         with torch.no_grad():
             accuracy = evaluate(test_loader, network)
-        lr = adjust_learning_rate(optimizer1, epoch, args.n_epoch3)  # lr 조정
+        lr = adjust_learning_rate(optimizer1, epoch, args.n_epoch4)  # lr 조정
         for i, (images, labels, indexes) in enumerate(train_loader_init):
             images = Variable(images).cuda()
             
-
             if not args.use_ricap:
                 labels = Variable(labels).cuda()
                 logits = network(images)
@@ -172,7 +175,6 @@ def label_correction(args, network, corrected_label, train_dataset, test_loader)
             loss_1.backward()
             optimizer1.step()
 
-
         print("Stage %d - " % stage, "epoch:%d" % epoch, "lr:%f" % lr, "train_loss:", globals_loss / ndata,
               "test_accuarcy:%f" % accuracy)
         test_acc.append(accuracy)
@@ -180,10 +182,7 @@ def label_correction(args, network, corrected_label, train_dataset, test_loader)
 
     log_data = np.concatenate(([train_loss], [test_acc]), axis=0)
     export_toexcel(args, log_data, 4)
-    print("** stage 3 max test accuracy:", max(test_acc))
-
-
-
+    print("** stage 4 max test accuracy:", max(test_acc))
 
 
 def export_toexcel(args, data, stage):
