@@ -16,7 +16,7 @@ import transform_ad
 import pickle
 import albumentations
 
-from curriculum import third_stage, label_correction
+from nextstage import third_stage, label_correction
 from utils import evaluate, adjust_learning_rate
 from resnet import ResNet50, ResNet101
 
