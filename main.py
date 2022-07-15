@@ -305,15 +305,14 @@ first_stage(network=basenet,test_loader=test_loader)
 if not args.test_third:
 	#2
 	filter_mask, ind_1_sorted = second_stage(network=basenet, test_loader=test_loader)
-	#3
-	third_stage(args, noise_or_not=noise_or_not, network=basenet, train_dataset=train_dataset, test_loader=test_loader, filter_mask=filter_mask, idx_sorted=ind_1_sorted.tolist())
-
 else:
 	print("**load pretrained mask from STAGE 2**")
 	with open("log/mask","rb") as fp:
 		filter_mask = pickle.load(fp)
 	with open("log/ind_sorted","rb") as fp:
 		ind_1_sorted = pickle.load(fp)
-
-	network_from_third = third_stage(args, noise_or_not=noise_or_not, network=basenet, train_dataset=train_dataset, test_loader=test_loader, filter_mask=filter_mask, idx_sorted=ind_1_sorted.tolist())
-	label_correction(args, network=network_from_third, train_dataset=train_dataset)
+	#3
+	network, correct_label = third_stage(args, noise_or_not=noise_or_not, network=basenet, train_dataset=train_dataset, test_loader=test_loader, filter_mask=filter_mask, idx_sorted=ind_1_sorted.tolist())
+	#4
+	
+	label_correction(args, network=network, corrected_label =correct_label, train_dataset=train_dataset, test_loader=test_loader)

@@ -68,3 +68,48 @@ class Mask_Select(data.Dataset):
 
     def __len__(self):
         return len(self.train_data)
+
+
+class Correct_label(data.Dataset): 
+    def __init__(self, origin_dataset, corrected_label):
+        self.transform = origin_dataset.transform
+        self.target_transform = origin_dataset.target_transform
+
+        #labels=origin_dataset.train_noisy_labels
+        dataset=origin_dataset.train_data
+
+        self.dataname=origin_dataset.dataset
+        self.origin_dataset=origin_dataset
+        
+        self.train_data = []
+        self.train_correct_labels = []
+        for i, m in enumerate(corrected_label):
+            self.train_data.append(dataset[i])
+            self.train_correct_labels.append(m)
+
+        print ("origin set number:%d"%len(self.train_correct_labels))
+
+    def __getitem__(self, index):
+        """
+        Args:
+            index (int): Index
+
+        Returns:
+            tuple: (image, target) where target is index of the target class.
+        """
+        img, target = self.train_data[index], self.train_correct_labels[index]
+
+        if self.dataname!='MinImagenet':
+            img = Image.fromarray(img)
+
+        #if self.transform is not None:
+        #    img = self.transform(img)
+
+        #if self.target_transform is not None:
+        #    target = self.target_transform(target)
+        img = self.target_transform(img)
+
+        return img, target, index
+
+    def __len__(self):
+        return len(self.train_data)
