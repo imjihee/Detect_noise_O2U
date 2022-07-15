@@ -7,8 +7,9 @@ from utils import evaluate, adjust_learning_rate
 import datetime
 from pytz import timezone
 import torch.distributed as dist
-from ricap_collator import RICAPCollactor, RICAPloss
-from ricap_trainer import ricap_dataset
+from ricap import RICAPCollactor, RICAPloss, ricap_dataset, ricap_criterion
+from time import sleep
+import pdb
 
 def worker_init_fn(worker_id: int) -> None:
     np.random.seed(np.random.get_state()[1][0] + worker_id)
@@ -36,19 +37,13 @@ def third_stage(args, noise_or_not, network, train_dataset, test_loader, filter_
             clean_train_dataset, replacement=False)
 
     if args.use_ricap:
-        train_batch_sampler = torch.utils.data.sampler.BatchSampler(
-            train_sampler,
-            batch_size=128,
-            drop_last=True)
         train_loader_init = torch.utils.data.DataLoader(
-            dataset=clean_train_dataset,
-            batch_sampler=train_batch_sampler,
+            dataset=ricap_dataset(clean_train_dataset),
+            batch_size=128,
             num_workers=32,
-            collate_fn=RICAPCollactor,
-            pin_memory=False,
-            worker_init_fn = worker_init_fn
-            )
-        criterion = RICAPloss()
+            shuffle=True, pin_memory=False)
+        criterion = torch.nn.CrossEntropyLoss(reduce=False, ignore_index=-1).cuda()
+        #RICAPloss()
     else:
         train_loader_init = torch.utils.data.DataLoader(
             dataset=clean_train_dataset,
@@ -76,10 +71,18 @@ def third_stage(args, noise_or_not, network, train_dataset, test_loader, filter_
         lr = adjust_learning_rate(optimizer1, epoch, args.n_epoch3)  # lr 조정
         for i, (images, labels, indexes) in enumerate(train_loader_init):
             images = Variable(images).cuda()
-            labels = Variable(labels).cuda()
-
-            logits = network(images)
-            loss_1 = criterion(logits, labels)
+            
+            #logits = network(images.float()) #logits: torch.Size([128, 10])
+            #loss_1 = ricap_criterion(logits, labels)
+            if not args.use_ricap:
+                labels = Variable(labels).cuda()
+                logits = network(images)
+                #pdb.set_trace()
+                loss_1 = criterion(logits, labels)
+            else:
+                labels = Variable(labels).type(torch.float32).cuda()
+                logits = network(images.float())
+                loss_1 = ricap_criterion(logits, labels)
 
             for pi, cl in zip(indexes, loss_1):
                 example_loss[pi] = cl.cpu().data.item()  # save loss of each samples
@@ -90,6 +93,8 @@ def third_stage(args, noise_or_not, network, train_dataset, test_loader, filter_
             optimizer1.zero_grad()
             loss_1.backward()
             optimizer1.step()
+
+
         print("Stage %d - " % stage, "epoch:%d" % epoch, "lr:%f" % lr, "train_loss:", globals_loss / ndata,
               "test_accuarcy:%f" % accuracy)
 
@@ -99,6 +104,46 @@ def third_stage(args, noise_or_not, network, train_dataset, test_loader, filter_
     log_data = np.concatenate(([train_loss], [test_acc]), axis=0)
     export_toexcel(args, log_data)
     print("** stage 3 max test accuracy:", max(test_acc))
+    return network
+
+
+
+def label_correction(args, network, train_dataset):
+    train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
+													batch_size=64,
+													num_workers=1,
+													shuffle=True, pin_memory=True)
+    criterion = torch.nn.CrossEntropyLoss(reduce=False, ignore_index=-1).cuda()
+    optimizer1 = torch.optim.SGD(network.parameters(), lr=0.01, momentum=0.9, weight_decay=5e-4)
+    
+    for epoch in range(1, 5):
+        globals_loss = 0
+        network.train()
+        with torch.no_grad():
+            accuracy = evaluate(train_loader, network)
+        lr = adjust_learning_rate(optimizer1, epoch, 5)
+
+        for i, (images, labels, indexes) in enumerate(train_loader):
+            images = Variable(images).cuda()
+            labels = Variable(labels).cuda()
+
+            logits = network(images)
+
+            labels = torch.argmax(logits,dim=1)
+
+            loss_1 = criterion(logits, labels)
+
+            globals_loss += loss_1.sum().cpu().data.item()
+            loss_1 = loss_1.mean()
+
+            optimizer1.zero_grad()
+            loss_1.backward()
+            optimizer1.step()
+
+
+        print("Correction Stage - ", "epoch:%d" % epoch, "lr:%f" % lr, "train_loss:", globals_loss / 50000,
+              "_accuarcy:%f" % accuracy)
+
 
 
 def export_toexcel(args, data):

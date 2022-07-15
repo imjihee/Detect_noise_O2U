@@ -16,7 +16,7 @@ import transform_ad
 import pickle
 import albumentations
 
-from curriculum import third_stage
+from curriculum import third_stage, label_correction
 from utils import evaluate, adjust_learning_rate
 from resnet import ResNet50, ResNet101
 
@@ -179,6 +179,7 @@ def first_stage(network,test_loader):
 		print ("Stage %d - " % stage, "epoch:%d" % epoch, "lr:%f" % lr, "train_loss:", globals_loss /ndata, "test_accuarcy:%f" % accuracy)
 		torch.save(network.state_dict(), save_checkpoint)
 
+
 """
 Second Stage
 """
@@ -245,7 +246,7 @@ def second_stage(network,test_loader,max_epoch=args.n_epoch2):
 
 		print ("Stage 2 - " + "epoch:%d" % epoch, "lr:%f" % lr, "train_loss:", globals_loss / ndata, "test_accuarcy:%f" % accuracy,"noise_accuracy:%f"%(1-noise_accuracy),"top 0.1 noise accuracy:%f"%top_accuracy)
 	
-	"""
+	#"""
 	#For args.test_third==True case
 	with open("log/mask","wb") as fp:
 		pickle.dump(mask, fp)
@@ -306,11 +307,13 @@ if not args.test_third:
 	filter_mask, ind_1_sorted = second_stage(network=basenet, test_loader=test_loader)
 	#3
 	third_stage(args, noise_or_not=noise_or_not, network=basenet, train_dataset=train_dataset, test_loader=test_loader, filter_mask=filter_mask, idx_sorted=ind_1_sorted.tolist())
+
 else:
 	print("**load pretrained mask from STAGE 2**")
 	with open("log/mask","rb") as fp:
 		filter_mask = pickle.load(fp)
 	with open("log/ind_sorted","rb") as fp:
 		ind_1_sorted = pickle.load(fp)
-	third_stage(args, noise_or_not=noise_or_not, network=basenet, train_dataset=train_dataset, test_loader=test_loader, filter_mask=filter_mask, idx_sorted=ind_1_sorted.tolist())
-#First stage --> get Filter mask from second stage --> first stage with Filter mask
+
+	network_from_third = third_stage(args, noise_or_not=noise_or_not, network=basenet, train_dataset=train_dataset, test_loader=test_loader, filter_mask=filter_mask, idx_sorted=ind_1_sorted.tolist())
+	label_correction(args, network=network_from_third, train_dataset=train_dataset)
