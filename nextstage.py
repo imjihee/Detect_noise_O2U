@@ -1,15 +1,19 @@
-import torch
-from torch.autograd import Variable
+from time import sleep
 import numpy as np
 import pandas as pd
-from data.mask_data import Mask_Select, Correct_label
-from utils import evaluate, adjust_learning_rate
+import pdb
+import pickle
 import datetime
 from pytz import timezone
+
+import torch
 import torch.distributed as dist
+from torch.autograd import Variable
+import torch.nn.functional as F
+
+from data.mask_data import Mask_Select, Correct_label
+from utils import evaluate, adjust_learning_rate
 from ricap import RICAPCollactor, RICAPloss, ricap_dataset, ricap_criterion
-from time import sleep
-import pdb
 
 def worker_init_fn(worker_id: int) -> None:
     np.random.seed(np.random.get_state()[1][0] + worker_id)
@@ -27,15 +31,7 @@ def third_stage(args, noise_or_not, network, train_dataset, test_loader, filter_
     if args.curriculum:
         sf = False #sf: shuffle
 
-    train_dataset.transf()
     clean_train_dataset = Mask_Select(train_dataset, filter_mask, idx_sorted, args.curriculum)
-
-    if dist.is_available() and dist.is_initialized():
-        train_sampler = torch.utils.data.distributed.DistributedSampler(
-            clean_train_dataset)
-    else:
-        train_sampler = torch.utils.data.sampler.RandomSampler(
-            clean_train_dataset, replacement=False)
 
     if args.use_ricap:
         train_loader_init = torch.utils.data.DataLoader(
@@ -53,10 +49,6 @@ def third_stage(args, noise_or_not, network, train_dataset, test_loader, filter_
             shuffle=True, pin_memory=False)
         criterion = torch.nn.CrossEntropyLoss(reduce=False, ignore_index=-1).cuda()
 
-    #save_checkpoint = args.network + '_' + args.dataset + '_' + args.noise_type + str(args.noise_rate) + '.pt'
-    #print("restore model from %s.pt" % save_checkpoint)
-    #network.load_state_dict(torch.load(save_checkpoint))
-
     ndata = train_dataset.__len__()
     optimizer1 = torch.optim.SGD(network.parameters(), lr=0.01, momentum=0.9, weight_decay=5e-4)
 
@@ -69,6 +61,7 @@ def third_stage(args, noise_or_not, network, train_dataset, test_loader, filter_
         with torch.no_grad():
             accuracy = evaluate(test_loader, network)
         correct_label = np.zeros_like(noise_or_not, dtype=int)  # sample 개수만큼 길이 가진 example_loss vector 생성
+        print()
         lr = adjust_learning_rate(optimizer1, epoch, args.n_epoch3)  # lr 조정
         for i, (images, labels, indexes) in enumerate(train_loader_init):
             images = Variable(images).cuda()
@@ -85,8 +78,11 @@ def third_stage(args, noise_or_not, network, train_dataset, test_loader, filter_
                 logits = network(images.float())
                 loss_1 = ricap_criterion(logits, labels)
             if epoch==args.n_epoch3-1:
-                for pi, cl in zip(indexes, torch.argmax(logits,dim=1)):
-                    correct_label[pi] = cl.item()  # save loss of each samples
+                outputs = F.log_softmax(logits, dim=1)
+                
+                for pi, cl in zip(indexes, torch.max(outputs.data, 1).indices):
+                    correct_label[pi.item()] = cl.item()  # save correct label of each samples
+                    #pdb.set_trace()
                     if light==False:
                         print("...make correct_label...")
                         light=True
@@ -108,6 +104,11 @@ def third_stage(args, noise_or_not, network, train_dataset, test_loader, filter_
     log_data = np.concatenate(([train_loss], [test_acc]), axis=0)
     export_toexcel(args, log_data, 3)
     print("** stage 3 max test accuracy:", max(test_acc))
+
+    lab_path = "log/correct_label/"+args.dataset+"_label_"+str(args.noise_rate)+"_"+str(args.remove_rate)+"_"+args.network
+    with open(lab_path,"wb") as fp:
+        pickle.dump(correct_label, fp)
+
     return network, correct_label
     
 
@@ -120,28 +121,12 @@ def label_correction(args, network, corrected_label, train_dataset, test_loader)
 
     correct_train_dataset = Correct_label(train_dataset, corrected_label)
 
-    if dist.is_available() and dist.is_initialized():
-        train_sampler = torch.utils.data.distributed.DistributedSampler(
-            correct_train_dataset)
-    else:
-        train_sampler = torch.utils.data.sampler.RandomSampler(
-            correct_train_dataset, replacement=False)
-
-    if args.use_ricap:
-        train_loader_init = torch.utils.data.DataLoader(
-            dataset=ricap_dataset(correct_train_dataset),
-            batch_size=128,
-            num_workers=32,
-            shuffle=True, pin_memory=False)
-        criterion = torch.nn.CrossEntropyLoss(reduce=False, ignore_index=-1).cuda()
-        #RICAPloss()
-    else:
-        train_loader_init = torch.utils.data.DataLoader(
-            dataset=correct_train_dataset,
-            batch_size=128,
-            num_workers=32,
-            shuffle=True, pin_memory=False)
-        criterion = torch.nn.CrossEntropyLoss(reduce=False, ignore_index=-1).cuda()
+    train_loader_init = torch.utils.data.DataLoader(
+        dataset=correct_train_dataset,
+        batch_size=128,
+        num_workers=32,
+        shuffle=True, pin_memory=False)
+    criterion = torch.nn.CrossEntropyLoss(reduce=False, ignore_index=-1).cuda()
 
     ndata = train_dataset.__len__()
     optimizer1 = torch.optim.SGD(network.parameters(), lr=0.01, momentum=0.9, weight_decay=5e-4)
@@ -158,15 +143,10 @@ def label_correction(args, network, corrected_label, train_dataset, test_loader)
         for i, (images, labels, indexes) in enumerate(train_loader_init):
             images = Variable(images).cuda()
             
-            if not args.use_ricap:
-                labels = Variable(labels).cuda()
-                logits = network(images)
-                #pdb.set_trace()
-                loss_1 = criterion(logits, labels)
-            else:
-                labels = Variable(labels).type(torch.float32).cuda()
-                logits = network(images.float())
-                loss_1 = ricap_criterion(logits, labels)
+            labels = Variable(labels).cuda()
+            logits = network(images)
+            #pdb.set_trace()
+            loss_1 = criterion(logits, labels)
 
             globals_loss += loss_1.sum().cpu().data.item()
             loss_1 = loss_1.mean()

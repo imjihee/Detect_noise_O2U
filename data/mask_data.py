@@ -50,8 +50,6 @@ class Mask_Select(data.Dataset):
         Returns:
             tuple: (image, target) where target is index of the target class.
         """
-        if index>45000:
-            print(index)
         img, target = self.train_data[index], self.train_noisy_labels[index]
 
         if self.dataname!='MinImagenet':
@@ -102,11 +100,6 @@ class Correct_label(data.Dataset):
         if self.dataname!='MinImagenet':
             img = Image.fromarray(img)
 
-        #if self.transform is not None:
-        #    img = self.transform(img)
-
-        #if self.target_transform is not None:
-        #    target = self.target_transform(target)
         img = self.target_transform(img)
 
         return img, target, index

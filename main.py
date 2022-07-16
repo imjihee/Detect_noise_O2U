@@ -48,6 +48,7 @@ parser.add_argument('--unstabitily_batch', type=int, default=16)
 parser.add_argument('--curriculum', action='store_true')
 parser.add_argument('--use_ricap', action='store_true')
 parser.add_argument('--test_third', action='store_true')
+parser.add_argument('--test_four', action='store_true')
 args = parser.parse_args()
 print(args)
 # Seed
@@ -249,7 +250,7 @@ def second_stage(network,test_loader,max_epoch=args.n_epoch2):
 	
 	#"""
 	#For args.test_third==True case
-	mask_path = "log/mask/"+args.dataset+"mask_"+str(args.noise_rate)+"_"+str(args.remove_rate)
+	mask_path = "log/mask/"+args.dataset+"mask_"+str(args.noise_rate)+"_"+str(args.remove_rate)+"_"+args.network
 	with open(mask_path,"wb") as fp:
 		pickle.dump(mask, fp)
 	with open("log/ind_sorted","wb") as fp:
@@ -309,11 +310,16 @@ if not args.test_third:
 	filter_mask, ind_1_sorted = second_stage(network=basenet, test_loader=test_loader)
 else:
 	print("**load pretrained mask from STAGE 2**")
-	with open("log/mask","rb") as fp:
+	with open("log/mask/cifar10mask_0.6_0.85_resnet50","rb") as fp:
 		filter_mask = pickle.load(fp)
 	with open("log/ind_sorted","rb") as fp:
 		ind_1_sorted = pickle.load(fp)
 #3
-network, correct_label = third_stage(args, noise_or_not=noise_or_not, network=basenet, train_dataset=train_dataset, test_loader=test_loader, filter_mask=filter_mask, idx_sorted=ind_1_sorted.tolist())
+if not args.test_four:
+	network, correct_label = third_stage(args, noise_or_not=noise_or_not, network=basenet, train_dataset=train_dataset, test_loader=test_loader, filter_mask=filter_mask, idx_sorted=ind_1_sorted.tolist())
+else:
+	print("**load corrected label from STAGE 3**")
+	with open("log/mask","rb") as fp:
+		correct_label = pickle.load(fp)
 #4
-label_correction(args, network=network, corrected_label =correct_label, train_dataset=train_dataset, test_loader=test_loader)
+label_correction(args, network=basenet, corrected_label =correct_label, train_dataset=train_dataset, test_loader=test_loader)
