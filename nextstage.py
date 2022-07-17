@@ -7,6 +7,7 @@ import datetime
 from pytz import timezone
 
 import torch
+import collections
 import torch.distributed as dist
 from torch.autograd import Variable
 import torch.nn.functional as F
@@ -52,6 +53,9 @@ def third_stage(args, noise_or_not, network, train_dataset, test_loader, filter_
     ndata = train_dataset.__len__()
     optimizer1 = torch.optim.SGD(network.parameters(), lr=0.01, momentum=0.9, weight_decay=5e-4)
 
+    correct_label = np.zeros_like(noise_or_not, dtype=int)  # sample 개수만큼 길이 가진 example_loss vector 생성
+    
+
     print("----------- Start Third Stage -----------")
 
     for epoch in range(1, args.n_epoch3):
@@ -60,7 +64,7 @@ def third_stage(args, noise_or_not, network, train_dataset, test_loader, filter_
         network.train()
         with torch.no_grad():
             accuracy = evaluate(test_loader, network)
-        correct_label = np.zeros_like(noise_or_not, dtype=int)  # sample 개수만큼 길이 가진 example_loss vector 생성
+        
         print()
         lr = adjust_learning_rate(optimizer1, epoch, args.n_epoch3)  # lr 조정
         for i, (images, labels, indexes) in enumerate(train_loader_init):
@@ -77,15 +81,17 @@ def third_stage(args, noise_or_not, network, train_dataset, test_loader, filter_
                 labels = Variable(labels).type(torch.float32).cuda()
                 logits = network(images.float())
                 loss_1 = ricap_criterion(logits, labels)
+
             if epoch==args.n_epoch3-1:
                 outputs = F.log_softmax(logits, dim=1)
-                
                 for pi, cl in zip(indexes, torch.max(outputs.data, 1).indices):
-                    correct_label[pi.item()] = cl.item()  # save correct label of each samples
+                    idx, mx = pi.item(), cl.item()
+                    correct_label[idx] = mx  # save correct label of each samples
                     #pdb.set_trace()
                     if light==False:
                         print("...make correct_label...")
                         light=True
+            
 
             globals_loss += loss_1.sum().cpu().data.item()
             loss_1 = loss_1.mean()
@@ -97,12 +103,15 @@ def third_stage(args, noise_or_not, network, train_dataset, test_loader, filter_
         
         print("Stage %d - " % stage, "epoch:%d" % epoch, "lr:%f" % lr, "train_loss:", globals_loss / ndata,
               "test_accuarcy:%f" % accuracy)
+        
 
         test_acc.append(accuracy)
         train_loss.append(globals_loss/ndata)
 
     log_data = np.concatenate(([train_loss], [test_acc]), axis=0)
     export_toexcel(args, log_data, 3)
+    counter = collections.Counter(correct_label)
+    print("Correction Result:", counter)
     print("** stage 3 max test accuracy:", max(test_acc))
 
     lab_path = "log/correct_label/"+args.dataset+"_label_"+str(args.noise_rate)+"_"+str(args.remove_rate)+"_"+args.network
@@ -111,7 +120,9 @@ def third_stage(args, noise_or_not, network, train_dataset, test_loader, filter_
 
     return network, correct_label
     
-
+"""
+Fourth Stage
+"""
 #Stage 4
 def label_correction(args, network, corrected_label, train_dataset, test_loader):
     
