@@ -18,6 +18,7 @@ import albumentations
 
 from nextstage import third_stage, label_correction
 from utils import evaluate, adjust_learning_rate
+from utils import evaluate, adjust_learning_rate
 from resnet import ResNet50, ResNet101
 
 import torch.nn as nn
@@ -151,6 +152,8 @@ def first_stage(network,test_loader):
 		print("----------- SKIP First Stage -----------")
 	else:
 		print("----------- Start First Stage -----------")
+	
+	example_loss = [[0] for x in range(len(noise_or_not))]
 	for epoch in range(1, args.n_epoch1):
 		# train models
 		globals_loss = 0
@@ -158,7 +161,8 @@ def first_stage(network,test_loader):
 		
 		with torch.no_grad():
 			accuracy = evaluate(test_loader, network)
-		example_loss = np.zeros_like(noise_or_not, dtype=float) #sample 개수만큼 길이 가진 example_loss vector 생성
+		 
+		#example_loss = np.zeros_like(noise_or_not, dtype=float) #sample 개수만큼 길이 가진 example_loss vector 생성
 		lr=adjust_learning_rate(optimizer1,epoch,args.n_epoch1)
 
 		for i, (images, labels, indexes) in enumerate(train_loader_init):
@@ -169,7 +173,8 @@ def first_stage(network,test_loader):
 			loss_1 = criterion(logits, labels)
 
 			for pi, cl in zip(indexes, loss_1):
-				example_loss[pi] = cl.cpu().data.item() #save loss of each samples
+				#example_loss[pi] = cl.cpu().data.item() #save loss of each samples
+				example_loss[pi].append(cl.cpu().data.item())
 
 			globals_loss += loss_1.sum().cpu().data.item()
 			loss_1 = loss_1.mean()
@@ -180,6 +185,17 @@ def first_stage(network,test_loader):
 
 		print ("Stage %d - " % stage, "epoch:%d" % epoch, "lr:%f" % lr, "train_loss:", globals_loss /ndata, "test_accuarcy:%f" % accuracy)
 		torch.save(network.state_dict(), save_checkpoint)
+
+	example_var = np.zeros_like(noise_or_not, dtype=float)
+	#example_loss = example_loss[:, 5:]
+	for idx, temp in enumerate(example_loss):
+		example_var[idx] = np.var(temp[5:])
+	cut_20=np.percentile(example_var, 20, interpolation='nearest')
+	masking = np.where(example_var < cut_20, True, False)
+	correct_acc = np.sum(np.logical_and(masking, noise_or_not)) / len(noise_or_not)
+	print("masking percentage:", np.sum(masking)/len(masking))
+	print("** Variation Matching Accuracy: ", correct_acc)
+
 
 
 """
@@ -197,6 +213,7 @@ def second_stage(network,test_loader,max_epoch=args.n_epoch2):
 	ndata = train_dataset.__len__()
 
 	print("----------- Start Second Stage -----------")
+
 	for epoch in range(1, max_epoch):
 		# train models
 		globals_loss=0
@@ -243,10 +260,12 @@ def second_stage(network,test_loader,max_epoch=args.n_epoch2):
 		mask = np.ones_like(noise_or_not,dtype=np.float32)
 		mask[ind_1_sorted[num_remember:]]=0 #지워야 할 인덱스에 대해 0 저장. mask[idx]=0
 
+		correct_acc = np.sum(np.logical_and(mask, noise_or_not)) / (np.sum(mask))
+
 		top_accuracy_rm=int(0.9 * len(loss_1_sorted))
 		top_accuracy= 1-np.sum(noise_or_not[ind_1_sorted[top_accuracy_rm:]]) / float(len(loss_1_sorted) - top_accuracy_rm)
 
-		print ("Stage 2 - " + "epoch:%d" % epoch, "lr:%f" % lr, "train_loss:", globals_loss / ndata, "test_accuarcy:%f" % accuracy,"noise_accuracy:%f"%(1-noise_accuracy),"top 0.1 noise accuracy:%f"%top_accuracy)
+		print ("Stage 2 - " + "epoch:%d" % epoch, "lr:%f" % lr, "train_loss:", globals_loss / ndata, "test_accuarcy:%f" % accuracy,"!!noise_accuracy:%f"%(correct_acc),"!! top 0.1 noise accuracy:%f"%top_accuracy)
 	
 	#"""
 	#For args.test_third==True case
